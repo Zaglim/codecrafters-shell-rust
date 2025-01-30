@@ -16,8 +16,6 @@ fn main() {
         
         let (command, following) = input.split_once(' ').unwrap_or((input, ""));
         
-        // let mut words = input.split_whitespace();
-        // let command = words.next().unwrap_or("");
         match command {
             "exit" => { 
                 match following {
