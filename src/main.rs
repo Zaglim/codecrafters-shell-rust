@@ -13,10 +13,20 @@ fn main() {
             stdin.read_line(&mut buff).unwrap();
             &buff.trim()[..]
         };
-
-        match input {
-            "exit 0" => break,
-            _ => println!("{}: command not found", input),
+        
+        let (command, following) = input.split_once(' ').unwrap_or((input, ""));
+        
+        // let mut words = input.split_whitespace();
+        // let command = words.next().unwrap_or("");
+        match command {
+            "exit" => { 
+                match following {
+                    "0" => break,
+                    _ => unimplemented!()
+                }
+            },
+            "echo" => println!("{}", following),
+            _ => println!("{}: command not found", command),
         }
     }
 }
