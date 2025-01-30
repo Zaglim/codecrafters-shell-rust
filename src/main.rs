@@ -7,13 +7,16 @@ fn main() {
     loop {
         print!("$ ");
         io::stdout().flush().unwrap();
-        let mut input = String::new();
+        let mut buff = String::new();
+        let input = {
+            // Wait for user input
+            stdin.read_line(&mut buff).unwrap();
+            &buff.trim()[..]
+        };
 
-        // Wait for user input
-        stdin.read_line(&mut input).unwrap();
-        match &input.trim()[..] {
+        match input {
             "exit 0" => break,
-            _ => println!("{}: command not found", input.trim()),
+            _ => println!("{}: command not found", input),
         }
     }
 }
