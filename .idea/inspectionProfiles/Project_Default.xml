@@ -67,6 +67,12 @@
       <option name="ignoreAnnotations" value="true" />
     </inspection_tool>
     <inspection_tool class="PyShadowingNamesInspection" enabled="true" level="INFORMATION" enabled_by_default="true" editorAttributes="INFORMATION_ATTRIBUTES" />
+    <inspection_tool class="RsAssociatedTypeMismatch" enabled="true" level="ERROR" enabled_by_default="true" />
+    <inspection_tool class="RsExperimentalChecks" enabled="true" level="TEXT ATTRIBUTES" enabled_by_default="true" editorAttributes="CONSIDERATION_ATTRIBUTES" />
+    <inspection_tool class="RsExperimentalTraitObligations" enabled="true" level="ERROR" enabled_by_default="true" />
+    <inspection_tool class="RsExperimentalTypeCheck" enabled="true" level="ERROR" enabled_by_default="true" />
+    <inspection_tool class="RsExperimentalUnresolvedMethod" enabled="true" level="ERROR" enabled_by_default="true" />
+    <inspection_tool class="RsExperimentalUnresolvedPath" enabled="true" level="ERROR" enabled_by_default="true" />
     <inspection_tool class="SSBasedInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <replaceConfiguration name="Shorthand Array" description="Use shorthand Type[] over Array&lt;Type&gt;" suppressId="verbose-Array" problemDescriptor="Can use the array shorthand" cleanup="true" text="$something$: Array&lt;$type$&gt;" recursive="false" caseInsensitive="true" type="TypeScript" reformatAccordingToStyle="false" shortenFQN="false" replacement="$something$: $type$[]">
         <constraint name="__context__" within="" contains="" />
