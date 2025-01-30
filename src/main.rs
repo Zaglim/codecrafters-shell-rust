@@ -1,9 +1,10 @@
-use once_cell::unsync::Lazy;
+use once_cell::sync::Lazy;
 #[allow(unused_imports)]
 use std::io::{self, Write};
 use std::path::Path;
+use std::process;
 
-const PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
+static PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
 fn main() {
     // PATH.set(std::env::var("PATH").unwrap()).unwrap();
 
@@ -16,27 +17,34 @@ fn main() {
         let input = {
             // Wait for user input
             stdin.read_line(&mut buff).unwrap();
-            &buff.trim()[..]
+            &buff.trim()
         };
 
         let (command_str, following) = input.split_once(' ').unwrap_or((input, ""));
 
         match command_str.try_into() {
-            Ok(command) => {
-                if matches!(command, BuiltinCommand::Exit) {
+            Ok(builtin) => {
+                if matches!(builtin, BuiltinCommand::Exit) {
                     break;
                 } else {
-                    command.run_with(following);
+                    builtin.run_with(following);
                 }
             }
             Err(_) => {
-                println!("{}: command not found", command_str)
+                let run_attempt = process::Command::new(command_str)
+                    .args(following.split_whitespace())
+                    .spawn();
+                if let Ok(mut child) = run_attempt {
+                    child.wait().expect("the child process should have run");
+                } else {
+                    println!("{}: command not found", command_str);
+                }
             }
         }
     }
 }
 
-fn first_match_in_path<'a>(name: &str) -> Option<Box<Path>> {
+fn first_match_in_path(name: &str) -> Option<Box<Path>> {
     for path_str in PATH.split(':') {
         let path = Path::new(path_str).join(name);
         if path.is_file() {
@@ -57,15 +65,15 @@ impl BuiltinCommand {
         match self {
             BuiltinCommand::Echo => println!("{args_str}"),
             BuiltinCommand::Type => {
-                if let Ok(_) = BuiltinCommand::try_from(args_str) {
+                if BuiltinCommand::try_from(args_str).is_ok() {
                     println!("{args_str} is a shell builtin");
-                } else {
-                    if let Some(path) = first_match_in_path(args_str) {
-                        println!("{args_str} is {}", path.display());
-                    } else {
-                        println!("{args_str}: not found")
-                    }
+                    return;
                 }
+                if let Some(path) = first_match_in_path(args_str) {
+                    println!("{args_str} is {}", path.display());
+                    return;
+                }
+                println!("{args_str}: not found")
             }
             _ => unimplemented!(),
         }
