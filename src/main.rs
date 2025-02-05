@@ -5,9 +5,49 @@ use std::path::Path;
 use std::process;
 
 static PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
-fn main() {
-    // PATH.set(std::env::var("PATH").unwrap()).unwrap();
 
+trait BashQuoting {
+    fn process_bash_quoting(&self) -> Vec<String>;
+}
+
+impl BashQuoting for &str {
+    fn process_bash_quoting(&self) -> Vec<String> {
+        // remove literal nothings
+        let without_nothing_quote = self.replace("''", "");
+        let mut iter = without_nothing_quote.split('\'');
+
+        let unquoted_start = if let Some(start) = iter.next() {
+            start
+        } else {
+            return vec![];
+        };
+
+        let mut result = unquoted_start
+            .split_whitespace()
+            .map(|s| String::from(s))
+            .collect::<Vec<String>>();
+
+        // the iterator contains alternating quoted segments and unquoted segments
+        while let Some(quoted) = iter.next() {
+            result.push(String::from(quoted));
+            if let Some(unquoted) = iter.next() {
+                for word in unquoted.split_whitespace() {
+                    result.push(String::from(word));
+                }
+            }
+        }
+
+        for quoted in iter {
+            if !quoted.is_empty() {
+                result.push(String::from(quoted));
+            }
+        }
+
+        result.into()
+    }
+}
+
+fn main() {
     let stdin = io::stdin();
 
     loop {
@@ -21,19 +61,18 @@ fn main() {
         };
 
         let (command_str, following) = input.split_once(' ').unwrap_or((input, ""));
+        let args = following.process_bash_quoting();
 
         match command_str.try_into() {
             Ok(builtin) => {
                 if matches!(builtin, BuiltinCommand::Exit) {
                     break;
                 } else {
-                    builtin.run_with(following);
+                    builtin.run_with(args);
                 }
             }
             Err(_) => {
-                let run_attempt = process::Command::new(command_str)
-                    .args(following.split_whitespace())
-                    .spawn();
+                let run_attempt = process::Command::new(command_str).args(args).spawn();
                 if let Ok(mut child) = run_attempt {
                     child.wait().expect("the child process should have run");
                 } else {
@@ -46,9 +85,9 @@ fn main() {
 
 fn first_match_in_path(name: &str) -> Option<Box<Path>> {
     for path_str in PATH.split(':') {
-        let path = Path::new(path_str).join(name);
-        if path.is_file() {
-            return Some(Box::from(path));
+        let path_buf = Path::new(path_str).join(name);
+        if path_buf.is_file() {
+            return Some(Box::from(path_buf));
         }
     }
     None
@@ -61,21 +100,25 @@ enum BuiltinCommand {
 }
 
 impl BuiltinCommand {
-    fn run_with(&self, args_str: &str) {
+    fn run_with(&self, args: Vec<String>) {
         match self {
-            BuiltinCommand::Echo => println!("{args_str}"),
+            BuiltinCommand::Echo => println!("{}", args.join(" ")),
             BuiltinCommand::Type => {
-                if BuiltinCommand::try_from(args_str).is_ok() {
-                    println!("{args_str} is a shell builtin");
-                    return;
+                if let Some(&ref first) = args.first() {
+                    if BuiltinCommand::try_from(&first[..]).is_ok() {
+                        println!("{first} is a shell builtin");
+                        return;
+                    }
+                    if let Some(path) = first_match_in_path(&first[..]) {
+                        println!("{} is {}", first, path.display());
+                        return;
+                    }
+                    println!("{first}: not found")
+                } else {
+                    unimplemented!()
                 }
-                if let Some(path) = first_match_in_path(args_str) {
-                    println!("{args_str} is {}", path.display());
-                    return;
-                }
-                println!("{args_str}: not found")
             }
-            _ => unimplemented!(),
+            BuiltinCommand::Exit => unimplemented!(),
         }
     }
 }
