@@ -6,45 +6,50 @@ use std::process;
 
 static PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
 
-trait BashQuoting {
-    fn process_bash_quoting(&self) -> Vec<String>;
+fn process_single_quotes(input: &str) -> Vec<&str> {
+    // remove literal nothings
+    let mut iter = input.split('\'');
+
+    let unquoted_start: Vec<&str> = if let Some(start) = iter.next() {
+        start.split_whitespace().collect()
+    } else {
+        return vec![];
+    };
+    let mut unquoted_end: Vec<&str> = if let Some(end) = iter.next_back() {
+        end.split_whitespace().collect()
+    } else {
+        return unquoted_start;
+    };
+
+    let mut result = unquoted_start;
+
+    // the iterator contains alternating quoted segments and unquoted segments
+    while let Some(quoted) = iter.next() {
+        result.push(quoted);
+        if let Some(unquoted) = iter.next() {
+            for word in unquoted.split_whitespace() {
+                result.push(word);
+            }
+        }
+    }
+
+    result.append(&mut unquoted_end);
+
+    result
 }
 
+trait BashQuoting {
+    fn bashify(&self) -> Vec<&str>;
+}
 impl BashQuoting for &str {
-    fn process_bash_quoting(&self) -> Vec<String> {
-        // remove literal nothings
-        let without_nothing_quote = self.replace("''", "");
-        let mut iter = without_nothing_quote.split('\'');
-
-        let unquoted_start = if let Some(start) = iter.next() {
-            start
-        } else {
-            return vec![];
-        };
-
-        let mut result = unquoted_start
-            .split_whitespace()
-            .map(|s| String::from(s))
-            .collect::<Vec<String>>();
-
-        // the iterator contains alternating quoted segments and unquoted segments
-        while let Some(quoted) = iter.next() {
-            result.push(String::from(quoted));
-            if let Some(unquoted) = iter.next() {
-                for word in unquoted.split_whitespace() {
-                    result.push(String::from(word));
-                }
-            }
-        }
-
-        for quoted in iter {
-            if !quoted.is_empty() {
-                result.push(String::from(quoted));
-            }
-        }
-
-        result.into()
+    fn bashify(&self) -> Vec<&str> {
+        process_single_quotes(self)
     }
+}
+
+fn process_double_quotes(input: Vec<&str>) -> Vec<&str> {
+    
+    todo!()
 }
 
 fn main() {
@@ -60,19 +65,24 @@ fn main() {
             &buff.trim()
         };
 
-        let (command_str, following) = input.split_once(' ').unwrap_or((input, ""));
-        let args = following.process_bash_quoting();
+        let without_nothing_quote = input.replace("''", "").replace("\"\"", "");
+        let a = without_nothing_quote.as_str();
 
-        match command_str.try_into() {
+        let processed = a.bashify();
+        let mut iter = processed.iter();
+        let command_str = iter.next().unwrap();
+        let following: Vec<&str> = iter.copied().collect();
+
+        match command_str[..].try_into() {
             Ok(builtin) => {
                 if matches!(builtin, BuiltinCommand::Exit) {
                     break;
                 } else {
-                    builtin.run_with(args);
+                    builtin.run_with(following);
                 }
             }
             Err(_) => {
-                let run_attempt = process::Command::new(command_str).args(args).spawn();
+                let run_attempt = process::Command::new(command_str).args(following).spawn();
                 if let Ok(mut child) = run_attempt {
                     child.wait().expect("the child process should have run");
                 } else {
@@ -100,11 +110,11 @@ enum BuiltinCommand {
 }
 
 impl BuiltinCommand {
-    fn run_with(&self, args: Vec<String>) {
+    fn run_with(&self, args: Vec<&str>) {
         match self {
             BuiltinCommand::Echo => println!("{}", args.join(" ")),
             BuiltinCommand::Type => {
-                if let Some(&ref first) = args.first() {
+                if let Some(first) = args.first() {
                     if BuiltinCommand::try_from(&first[..]).is_ok() {
                         println!("{first} is a shell builtin");
                         return;
