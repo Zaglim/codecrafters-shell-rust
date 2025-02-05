@@ -3,53 +3,78 @@ use once_cell::sync::Lazy;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process;
+use std::vec::IntoIter;
 
 static PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
 
-fn process_single_quotes(input: &str) -> Vec<&str> {
-    // remove literal nothings
-    let mut iter = input.split('\'');
-
-    let unquoted_start: Vec<&str> = if let Some(start) = iter.next() {
-        start.split_whitespace().collect()
-    } else {
-        return vec![];
-    };
-    let mut unquoted_end: Vec<&str> = if let Some(end) = iter.next_back() {
-        end.split_whitespace().collect()
-    } else {
-        return unquoted_start;
-    };
-
-    let mut result = unquoted_start;
-
-    // the iterator contains alternating quoted segments and unquoted segments
-    while let Some(quoted) = iter.next() {
-        result.push(quoted);
-        if let Some(unquoted) = iter.next() {
-            for word in unquoted.split_whitespace() {
-                result.push(word);
-            }
-        }
-    }
-
-    result.append(&mut unquoted_end);
-
-    result
-}
-
 trait BashQuoting {
     fn bashify(&self) -> Vec<&str>;
-}
-impl BashQuoting for &str {
-    fn bashify(&self) -> Vec<&str> {
-        process_single_quotes(self)
-    }
+
+    fn process_double_quotes(&self) -> IntoIter<&str>;
 }
 
-fn process_double_quotes(input: Vec<&str>) -> Vec<&str> {
-    
-    todo!()
+impl BashQuoting for str {
+    fn bashify(&self) -> Vec<&str> {
+        let mut iter = self.split('\'');
+
+        let unquoted_start: Vec<&str> = if let Some(start) = iter.next() {
+            start.process_double_quotes().collect()
+        } else {
+            return vec![];
+        };
+        let mut unquoted_end: Vec<&str> = if let Some(end) = iter.next_back() {
+            end.process_double_quotes().collect()
+        } else {
+            return unquoted_start;
+        };
+
+        let mut result = unquoted_start;
+
+        // the iterator contains alternating quoted segments and unquoted segments
+        while let Some(quoted) = iter.next() {
+            result.push(quoted);
+            if let Some(unquoted) = iter.next() {
+                unquoted
+                    .process_double_quotes()
+                    .for_each(|word| result.push(word));
+            }
+        }
+
+        result.append(&mut unquoted_end);
+
+        result
+    }
+
+    fn process_double_quotes(&self) -> IntoIter<&str> {
+        let mut iter = self.split('"');
+
+        let unquoted_start: Vec<&str> = if let Some(start) = iter.next() {
+            start.split_whitespace().collect()
+        } else {
+            return vec![].into_iter();
+        };
+        let mut unquoted_end: Vec<&str> = if let Some(end) = iter.next_back() {
+            end.split_whitespace().collect()
+        } else {
+            return unquoted_start.into_iter();
+        };
+
+        let mut result = unquoted_start;
+
+        // the iterator contains alternating quoted segments and unquoted segments
+        while let Some(quoted) = iter.next() {
+            result.push(quoted);
+            if let Some(unquoted) = iter.next() {
+                unquoted
+                    .split_whitespace()
+                    .for_each(|word| result.push(word));
+            }
+        }
+
+        result.append(&mut unquoted_end);
+
+        result.into_iter()
+    }
 }
 
 fn main() {
