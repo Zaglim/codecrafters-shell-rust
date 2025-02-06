@@ -3,109 +3,79 @@ use once_cell::sync::Lazy;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process;
-use std::vec::IntoIter;
+use std::str::Chars;
 
 static PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
 
-trait BashQuoting {
-    fn bashify(&self) -> Vec<&str>;
+fn bashify(input: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut iter = input.trim().chars();
 
-    fn process_double_quotes(&self) -> IntoIter<&str>;
+    let mut arg_builder = String::new();
+
+    while let Some(char) = iter.next() {
+        match char {
+            _ if char.is_whitespace() => {
+                if !arg_builder.is_empty() {
+                    args.push(arg_builder);
+                    arg_builder = String::new();
+                }
+            }
+            delim @ ('"' | '\'') => match build_until(delim, &mut iter) {
+                Ok(s) => arg_builder.push_str(s),
+                Err(ending) => {
+                    arg_builder.push(delim);
+                    arg_builder.push_str(ending)
+                }
+            },
+            _ => arg_builder.push(char),
+        }
+    }
+    args.push(arg_builder);
+    args
 }
 
-impl BashQuoting for str {
-    fn bashify(&self) -> Vec<&str> {
-        let mut iter = self.split('\'');
+/// Progresses the iterator until it reaches the `delimiter`.
+/// After returning, `iter` will have progressed passed the delimiter
+/// # Ok
+/// wraps the progressed slice (excluding the delimiter) in an `Ok`
+/// # Err
+/// wraps the progressed slice in an `Err` if end of iterator is reached
+fn build_until<'a>(delimiter: char, iter: &'a mut Chars) -> Result<&'a str, &'a str> {
+    let original = iter.as_str();
+    let start_index = 0;
 
-        let unquoted_start: Vec<&str> = if let Some(start) = iter.next() {
-            start.process_double_quotes().collect()
-        } else {
-            return vec![];
-        };
-        let mut unquoted_end: Vec<&str> = if let Some(end) = iter.next_back() {
-            end.process_double_quotes().collect()
-        } else {
-            return unquoted_start;
-        };
-
-        let mut result = unquoted_start;
-
-        // the iterator contains alternating quoted segments and unquoted segments
-        while let Some(quoted) = iter.next() {
-            result.push(quoted);
-            if let Some(unquoted) = iter.next() {
-                unquoted
-                    .process_double_quotes()
-                    .for_each(|word| result.push(word));
-            }
+    for (index, char) in iter.enumerate() {
+        if char == delimiter {
+            return Ok(&original[start_index..index]);
         }
-
-        result.append(&mut unquoted_end);
-
-        result
     }
 
-    fn process_double_quotes(&self) -> IntoIter<&str> {
-        let mut iter = self.split('"');
-
-        let unquoted_start: Vec<&str> = if let Some(start) = iter.next() {
-            start.split_whitespace().collect()
-        } else {
-            return vec![].into_iter();
-        };
-        let mut unquoted_end: Vec<&str> = if let Some(end) = iter.next_back() {
-            end.split_whitespace().collect()
-        } else {
-            return unquoted_start.into_iter();
-        };
-
-        let mut result = unquoted_start;
-
-        // the iterator contains alternating quoted segments and unquoted segments
-        while let Some(quoted) = iter.next() {
-            result.push(quoted);
-            if let Some(unquoted) = iter.next() {
-                unquoted
-                    .split_whitespace()
-                    .for_each(|word| result.push(word));
-            }
-        }
-
-        result.append(&mut unquoted_end);
-
-        result.into_iter()
-    }
+    Err(original)
 }
 
 fn main() {
     let stdin = io::stdin();
 
+    let mut buff = String::new();
     loop {
         print!("$ ");
         io::stdout().flush().unwrap();
-        let mut buff = String::new();
-        let input = {
+        let raw_input = {
+            buff.clear();
             // Wait for user input
             stdin.read_line(&mut buff).unwrap();
-            &buff.trim()
+            &buff
         };
 
-        let without_nothing_quote = input.replace("''", "").replace("\"\"", "");
-        let a = without_nothing_quote.as_str();
+        let processed: Vec<String> = bashify(raw_input);
+        let processed = processed.iter().map(String::as_str).collect::<Vec<_>>();
 
-        let processed = a.bashify();
-        let mut iter = processed.iter();
-        let command_str = iter.next().unwrap();
-        let following: Vec<&str> = iter.copied().collect();
+        let (&command_str, following) = processed.split_first().unwrap_or((&"", &[]));
 
         match command_str[..].try_into() {
-            Ok(builtin) => {
-                if matches!(builtin, BuiltinCommand::Exit) {
-                    break;
-                } else {
-                    builtin.run_with(following);
-                }
-            }
+            Ok(BuiltinCommand::Exit) => break,
+            Ok(other) => other.run_with(following.to_vec()),
             Err(_) => {
                 let run_attempt = process::Command::new(command_str).args(following).spawn();
                 if let Ok(mut child) = run_attempt {
@@ -135,16 +105,17 @@ enum BuiltinCommand {
 }
 
 impl BuiltinCommand {
-    fn run_with(&self, args: Vec<&str>) {
+    fn run_with<'a>(&self, args: impl IntoIterator<Item = &'a str>) {
+        let mut args_iter = args.into_iter();
         match self {
-            BuiltinCommand::Echo => println!("{}", args.join(" ")),
+            BuiltinCommand::Echo => println!("{}", args_iter.collect::<Vec<_>>().join(" ")),
             BuiltinCommand::Type => {
-                if let Some(first) = args.first() {
-                    if BuiltinCommand::try_from(&first[..]).is_ok() {
+                if let Some(first) = args_iter.next() {
+                    if BuiltinCommand::try_from(first).is_ok() {
                         println!("{first} is a shell builtin");
                         return;
                     }
-                    if let Some(path) = first_match_in_path(&first[..]) {
+                    if let Some(path) = first_match_in_path(first) {
                         println!("{} is {}", first, path.display());
                         return;
                     }
