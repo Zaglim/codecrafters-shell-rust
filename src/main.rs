@@ -1,13 +1,15 @@
+mod builtin_commands;
+
+use crate::builtin_commands::BuiltinCommand;
 use once_cell::sync::Lazy;
 #[allow(unused_imports)]
 use std::io::{self, Write};
-use std::path::Path;
 use std::process;
 use std::str::Chars;
 
 static PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
 
-fn bashify(input: &str) -> Vec<String> {
+fn bashify(input: &str) -> std::vec::IntoIter<String> {
     let mut args = Vec::new();
     let mut iter = input.trim().chars();
 
@@ -32,7 +34,7 @@ fn bashify(input: &str) -> Vec<String> {
         }
     }
     args.push(arg_builder);
-    args
+    args.into_iter()
 }
 
 /// Progresses the iterator until it reaches the `delimiter`.
@@ -57,88 +59,33 @@ fn build_until<'a>(delimiter: char, iter: &'a mut Chars) -> Result<&'a str, &'a 
 fn main() {
     let stdin = io::stdin();
 
-    let mut buff = String::new();
+    let mut input_buf = String::new();
     loop {
         print!("$ ");
         io::stdout().flush().unwrap();
         let raw_input = {
-            buff.clear();
+            input_buf.clear();
             // Wait for user input
-            stdin.read_line(&mut buff).unwrap();
-            &buff
+            stdin.read_line(&mut input_buf).unwrap();
+            &input_buf
         };
 
-        let processed: Vec<String> = bashify(raw_input);
-        let processed = processed.iter().map(String::as_str).collect::<Vec<_>>();
+        let mut bash_split = bashify(raw_input);
 
-        let (&command_str, following) = processed.split_first().unwrap_or((&"", &[]));
+        let command_str = bash_split.next().unwrap_or_default();
+        let args_iter = bash_split;
 
         match command_str[..].try_into() {
             Ok(BuiltinCommand::Exit) => break,
-            Ok(other) => other.run_with(following.to_vec()),
+            Ok(other) => other.run_with(args_iter),
             Err(_) => {
-                let run_attempt = process::Command::new(command_str).args(following).spawn();
+                let run_attempt = process::Command::new(&command_str).args(args_iter).spawn();
                 if let Ok(mut child) = run_attempt {
                     child.wait().expect("the child process should have run");
                 } else {
                     println!("{}: command not found", command_str);
                 }
             }
-        }
-    }
-}
-
-fn first_match_in_path(name: &str) -> Option<Box<Path>> {
-    for path_str in PATH.split(':') {
-        let path_buf = Path::new(path_str).join(name);
-        if path_buf.is_file() {
-            return Some(Box::from(path_buf));
-        }
-    }
-    None
-}
-
-enum BuiltinCommand {
-    Echo,
-    Type,
-    Exit,
-}
-
-impl BuiltinCommand {
-    fn run_with<'a>(&self, args: impl IntoIterator<Item = &'a str>) {
-        let mut args_iter = args.into_iter();
-        match self {
-            BuiltinCommand::Echo => println!("{}", args_iter.collect::<Vec<_>>().join(" ")),
-            BuiltinCommand::Type => {
-                if let Some(first) = args_iter.next() {
-                    if BuiltinCommand::try_from(first).is_ok() {
-                        println!("{first} is a shell builtin");
-                        return;
-                    }
-                    if let Some(path) = first_match_in_path(first) {
-                        println!("{} is {}", first, path.display());
-                        return;
-                    }
-                    println!("{first}: not found")
-                } else {
-                    unimplemented!()
-                }
-            }
-            BuiltinCommand::Exit => unimplemented!(),
-        }
-    }
-}
-
-impl TryFrom<&str> for BuiltinCommand {
-    type Error = ();
-
-    fn try_from(value: &str) -> Result<BuiltinCommand, Self::Error> {
-        use BuiltinCommand::*;
-        match value {
-            "echo" => Ok(Echo),
-            "type" => Ok(Type),
-            "exit" => Ok(Exit),
-            _ => Err(()),
         }
     }
 }
