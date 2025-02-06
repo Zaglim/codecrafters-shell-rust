@@ -23,6 +23,11 @@ fn bashify(input: &str) -> std::vec::IntoIter<String> {
                     arg_builder = String::new();
                 }
             }
+            '\\' => {
+                if let Some(following) = iter.next() {
+                    arg_builder.push(following);
+                }
+            },
             delim @ ('"' | '\'') => match build_until(delim, &mut iter) {
                 Ok(s) => arg_builder.push_str(s),
                 Err(ending) => {
