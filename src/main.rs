@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 #[allow(unused_imports)]
 use std::io::{self, Write};
 use std::process;
-use std::str::Chars;
+use std::str::{CharIndices, Chars};
 
 static PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
 
@@ -27,12 +27,12 @@ fn bashify(input: &str) -> std::vec::IntoIter<String> {
                 if let Some(following) = iter.next() {
                     arg_builder.push(following);
                 }
-            },
-            delim @ ('"' | '\'') => match build_until(delim, &mut iter) {
-                Ok(s) => arg_builder.push_str(s),
+            }
+            delim @ ('"' | '\'') => match build_quoted(delim, &mut iter) {
+                Ok(s) => arg_builder.push_str(&s),
                 Err(ending) => {
                     arg_builder.push(delim);
-                    arg_builder.push_str(ending)
+                    arg_builder.push_str(&ending)
                 }
             },
             _ => arg_builder.push(char),
@@ -48,17 +48,34 @@ fn bashify(input: &str) -> std::vec::IntoIter<String> {
 /// wraps the progressed slice (excluding the delimiter) in an `Ok`
 /// # Err
 /// wraps the progressed slice in an `Err` if end of iterator is reached
-fn build_until<'a>(delimiter: char, iter: &'a mut Chars) -> Result<&'a str, &'a str> {
+fn build_quoted(delimiter: char, iter: &mut Chars) -> Result<String, String> {
     let original = iter.as_str();
-    let start_index = 0;
 
-    for (index, char) in iter.enumerate() {
-        if char == delimiter {
-            return Ok(&original[start_index..index]);
+    let mut build = String::new();
+
+    while let Some(char) = iter.next() {
+        match char {
+            _ if char == delimiter => return Ok(build),
+            '\\' if delimiter == '"' => {
+                build.push_str(proccess_escape_in_double_quote(iter).as_str())
+            }
+            _ => build.push(char),
         }
     }
 
-    Err(original)
+    Err(original.to_string())
+}
+
+fn proccess_escape_in_double_quote(iter: &mut Chars) -> String {
+    let mut backslash = String::from('\\');
+    match iter.next() {
+        None => backslash,
+        Some(c@ ('$'|'\\'|'"')) => c.to_string(),
+        Some(c) => {
+            backslash.push(c);
+            backslash
+        }
+    }
 }
 
 fn main() {
