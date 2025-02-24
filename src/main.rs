@@ -1,46 +1,20 @@
 mod builtin_commands;
+mod commands;
+mod tokens;
 
-use crate::builtin_commands::BuiltinCommand;
+use crate::commands::{Command, CommandStream, SimpleCommand};
+use crate::tokens::*;
+use builtin_commands::BuiltinCommand;
+use commands::SimpleCommandType;
+use log::{info, max_level, LevelFilter};
 use once_cell::sync::Lazy;
-#[allow(unused_imports)]
-use std::io::{self, Write};
-use std::process;
-use std::str::{CharIndices, Chars};
+use std::io::Write;
+use std::io::{self};
+use std::iter::Peekable;
+use std::process::ExitCode;
+use std::str::Chars;
 
-static PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
-
-fn bashify(input: &str) -> std::vec::IntoIter<String> {
-    let mut args = Vec::new();
-    let mut iter = input.trim().chars();
-
-    let mut arg_builder = String::new();
-
-    while let Some(char) = iter.next() {
-        match char {
-            _ if char.is_whitespace() => {
-                if !arg_builder.is_empty() {
-                    args.push(arg_builder);
-                    arg_builder = String::new();
-                }
-            }
-            '\\' => {
-                if let Some(following) = iter.next() {
-                    arg_builder.push(following);
-                }
-            }
-            delim @ ('"' | '\'') => match build_quoted(delim, &mut iter) {
-                Ok(s) => arg_builder.push_str(&s),
-                Err(ending) => {
-                    arg_builder.push(delim);
-                    arg_builder.push_str(&ending)
-                }
-            },
-            _ => arg_builder.push(char),
-        }
-    }
-    args.push(arg_builder);
-    args.into_iter()
-}
+pub static PATH: Lazy<Box<str>> = Lazy::new(|| std::env::var("PATH").unwrap().into_boxed_str());
 
 /// Progresses the iterator until it reaches the `delimiter`.
 /// After returning, `iter` will have progressed passed the delimiter
@@ -48,10 +22,11 @@ fn bashify(input: &str) -> std::vec::IntoIter<String> {
 /// wraps the progressed slice (excluding the delimiter) in an `Ok`
 /// # Err
 /// wraps the progressed slice in an `Err` if end of iterator is reached
-fn build_quoted(delimiter: char, iter: &mut Chars) -> Result<String, String> {
-    let original = iter.as_str();
+fn build_quoted(iter: &mut Peekable<Chars>) -> Result<String, String> {
+    let original: String = iter.clone().collect();
 
     let mut build = String::new();
+    let delimiter = iter.next().unwrap();
 
     while let Some(char) = iter.next() {
         match char {
@@ -62,51 +37,72 @@ fn build_quoted(delimiter: char, iter: &mut Chars) -> Result<String, String> {
             _ => build.push(char),
         }
     }
-
-    Err(original.to_string())
+    Err(original)
 }
 
-fn proccess_escape_in_double_quote(iter: &mut Chars) -> String {
-    let mut backslash = String::from('\\');
+fn proccess_escape_in_double_quote(iter: &mut Peekable<Chars>) -> String {
     match iter.next() {
-        None => backslash,
-        Some(c@ ('$'|'\\'|'"')) => c.to_string(),
-        Some(c) => {
-            backslash.push(c);
-            backslash
+        None => {
+            todo!("determine what to do when BACKSLASH is the last in the stream")
         }
+        Some(c @ ('$' | '\\' | '"')) => c.into(),
+        Some(c) => ['\\', c].iter().collect(),
     }
 }
 
-fn main() {
-    let stdin = io::stdin();
+thread_local! {
+    pub static STDIN: io::Stdin = io::stdin();
+}
 
-    let mut input_buf = String::new();
+fn read_line() -> String {
+    let mut buf = String::new();
+    STDIN.with(|i| i.read_line(&mut buf)).unwrap();
+    buf
+}
+
+fn main() -> ExitCode {
+    #[cfg(debug_assertions)]
+    {
+        colog::default_builder()
+            .filter_level(LevelFilter::Trace)
+            .init();
+
+        log::log!(
+            log::max_level().to_level().unwrap(),
+            "logging level = {}",
+            max_level()
+        );
+    }
+
     loop {
         print!("$ ");
         io::stdout().flush().unwrap();
-        let raw_input = {
-            input_buf.clear();
-            // Wait for user input
-            stdin.read_line(&mut input_buf).unwrap();
-            &input_buf
-        };
+        let raw_input = read_line();
 
-        let mut bash_split = bashify(raw_input);
+        info!("{}", dbg!(&raw_input));
 
-        let command_str = bash_split.next().unwrap_or_default();
-        let args_iter = bash_split;
+        #[cfg(debug_assertions)]
+        dbg!(&raw_input);
 
-        match command_str[..].try_into() {
-            Ok(BuiltinCommand::Exit) => break,
-            Ok(other) => other.run_with(args_iter),
-            Err(_) => {
-                let run_attempt = process::Command::new(&command_str).args(args_iter).spawn();
-                if let Ok(mut child) = run_attempt {
-                    child.wait().expect("the child process should have run");
-                } else {
-                    println!("{}: command not found", command_str);
+        for command_construction_result in CommandStream::from(&raw_input).collect::<Vec<_>>() {
+            #[cfg(debug_assertions)]
+            dbg!(&command_construction_result);
+
+            match command_construction_result {
+                Ok(command) => {
+                    if matches!(
+                        command,
+                        Command::Simple(SimpleCommand {
+                            location: SimpleCommandType::Builtin(BuiltinCommand::Exit),
+                            ..
+                        })
+                    ) {
+                        return ExitCode::SUCCESS;
+                    }
+
+                    _ = command.run_blocking();
                 }
+                Err(commands::CommandConstructionError::NoCommand) => println!(),
             }
         }
     }

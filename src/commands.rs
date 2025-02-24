@@ -1,0 +1,318 @@
+use log::{debug, info, trace};
+use my_derives::MyFromStrParse;
+
+use crate::build_quoted;
+use crate::builtin_commands::BuiltinCommand;
+use crate::tokens::{Blank, Operator, RedirectCharacter, RedirectOperator};
+use crate::Token;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::iter::Peekable;
+use std::os::unix::process::ExitStatusExt;
+use std::path::PathBuf;
+use std::process::{ExitStatus, Output};
+use std::str::{Chars, FromStr};
+
+#[derive(Debug)]
+pub enum Command {
+    Simple(SimpleCommand),
+    #[allow(dead_code)]
+    Compound(CompoundCommand),
+}
+
+impl Command {
+    pub fn run_blocking(&self) -> ExitStatus {
+        match self {
+            Command::Simple(simple_command) => simple_command.run_blocking(),
+            Command::Compound(_compound) => todo!(),
+        }
+    }
+}
+
+impl TryFrom<Vec<Token>> for Command {
+    type Error = CommandConstructionError;
+
+    fn try_from(tokens: Vec<Token>) -> Result<Self, Self::Error> {
+        // todo implement compound commands!
+        Ok(Command::Simple(tokens.try_into()?))
+    }
+}
+
+#[derive(Debug)]
+pub enum CommandConstructionError {
+    NoCommand,
+}
+
+impl TryFrom<Vec<Token>> for SimpleCommand {
+    type Error = CommandConstructionError;
+
+    fn try_from(tokens: Vec<Token>) -> Result<Self, Self::Error> {
+        let (location, args) = tokens
+            .split_first()
+            .ok_or(CommandConstructionError::NoCommand)
+            .map(|(first, other)| {
+                let (_last, args) = other
+                    .split_last()
+                    .and_then(|(last, args)| {
+                        if !last.is_command_delimiter() {
+                            None
+                        } else {
+                            Some((last, args))
+                        }
+                    })
+                    .ok_or(CommandConstructionError::NoCommand)?;
+
+                let location = SimpleCommandType::from(first);
+                Ok((location, args.into()))
+            })??;
+
+        Ok(Self { location, args })
+    }
+}
+
+pub struct CommandStream<'a> {
+    iter: TokenStream<'a>,
+}
+
+struct TokenStream<'a> {
+    iter: Peekable<Chars<'a>>,
+}
+
+impl Iterator for TokenStream<'_> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut token_builder = String::new();
+
+        while let Some(peeked_char) = self.iter.peek() {
+            trace!("peek: {}", peeked_char);
+            match peeked_char {
+                w if w.to_string().parse::<Blank>().is_ok() => {
+                    self.iter.next(); // consume the blank
+                    if !token_builder.is_empty() {
+                        break;
+                    }
+                }
+                meta_c if Operator::may_start_with(meta_c.to_string().as_str()) => {
+                    match try_build_operator(&self.iter) {
+                        Ok(operator) => {
+                            if !token_builder.is_empty() {
+                                break;
+                            } else {
+                                token_builder = operator;
+                                for _ in token_builder.chars() {
+                                    self.iter.next();
+                                } // todo replace with clone instead
+                                break;
+                            }
+                        }
+                        Err(_) => {
+                            token_builder.push(self.iter.next().unwrap()); // consume peeked value
+                        }
+                    }
+                }
+                '\\' => {
+                    _ = self.iter.next();
+                    if let Some(following) = self.iter.next() {
+                        token_builder.push(following);
+                    }
+                }
+                '"' | '\'' => match build_quoted(&mut self.iter) {
+                    Ok(s) => token_builder.push_str(&s),
+                    Err(ending) => token_builder.push_str(&ending),
+                },
+                _ => token_builder.push(self.iter.next().unwrap()),
+            }
+            info!("token_builder = {token_builder}");
+        }
+        if token_builder.is_empty() {
+            return None;
+        }
+        let token = token_builder.into();
+        debug!("returning token: {token}");
+
+        Some(token)
+    }
+}
+
+fn try_build_operator(iter: &Peekable<Chars>) -> Result<String, ()> {
+    let mut iter_clone = iter.clone();
+    let mut buf = String::new();
+
+    while let Some(c) =
+        iter_clone.next_if(|c| Operator::may_start_with(&[buf.clone(), c.to_string()].join("")[..]))
+    {
+        buf += &c.to_string();
+    }
+    match buf.parse::<Operator>() {
+        Ok(_) => Ok(buf),
+        Err(_) => Err(()),
+    }
+}
+
+impl Iterator for CommandStream<'_> {
+    type Item = Result<Command, CommandConstructionError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut token_buff = Vec::new();
+        for token in self.iter.by_ref() {
+            if token.is_command_delimiter() {
+                token_buff.push(token);
+                break;
+            } else {
+                token_buff.push(token);
+            }
+        }
+        if token_buff.is_empty() {
+            None
+        } else {
+            Some(Command::try_from(token_buff))
+        }
+    }
+}
+
+impl<'a, T: AsRef<str>> From<&'a T> for CommandStream<'a> {
+    fn from(value: &'a T) -> Self {
+        Self {
+            iter: TokenStream {
+                iter: value.as_ref().chars().peekable(),
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct CompoundCommand {
+    // todo
+}
+
+#[derive(Debug)]
+pub(crate) struct SimpleCommand {
+    pub location: SimpleCommandType,
+    pub args: Vec<Token>,
+}
+
+impl SimpleCommand {
+    pub fn run_blocking(&self) -> ExitStatus {
+        if self
+            .args
+            .iter()
+            .any(|t| matches!(t, Token::Operator(Operator::Redirect(_))))
+        {
+            let (lhs, operator, rhs) = split_redirect(self);
+            match operator {
+                RedirectOperator::SingleChar(RedirectCharacter::GreaterThan) => {
+                    let path = PathBuf::from_str(&rhs.last().unwrap().to_string()[..]).unwrap();
+
+                    let evaluated_lhs = std::process::Command::new(lhs.location.to_string())
+                        .args(lhs.args.iter().map(|arg| arg.to_string()))
+                        .output();
+
+                    match evaluated_lhs {
+                        Ok(Output {
+                            status,
+                            stdout,
+                            stderr,
+                        }) => {
+                            let mut file = OpenOptions::new()
+                                .write(true)
+                                .create(true)
+                                .truncate(true)
+                                .open(path)
+                                .unwrap();
+                            file.write_all(&stdout[..]).unwrap();
+
+                            if !status.success() {
+                                println!("{}", String::from_utf8_lossy(&stderr).trim_end());
+                            }
+                            status
+                        }
+                        /*
+                        Ok(Output { status, stderr, .. }) => {} //
+                        */
+                        Err(_io_err) => todo!(),
+                    }
+                }
+                RedirectOperator::SingleChar(RedirectCharacter::LessThan) => todo!(),
+            }
+        } else {
+            self.run_truly_simple()
+        }
+    }
+
+    fn run_truly_simple(&self) -> ExitStatus {
+        match &self.location {
+            SimpleCommandType::Builtin(built_in) => built_in.run_with(&self.args),
+            SimpleCommandType::External(path) => {
+                let mut command = std::process::Command::new(path);
+                let run_attempt = command
+                    .args(self.args.iter().map(|arg| arg.to_string()))
+                    .spawn();
+
+                match run_attempt {
+                    Ok(mut child) => child.wait().unwrap(),
+                    Err(_) => {
+                        eprintln!("{}: command not found", &path.to_string_lossy());
+                        ExitStatus::from_raw(0)
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn split_redirect(command: &SimpleCommand) -> (SimpleCommand, RedirectOperator, &[Token]) {
+    let redirect_pos = command
+        .args
+        .iter()
+        .position(|t| matches!(t, Token::Operator(Operator::Redirect(_))))
+        .unwrap();
+
+    let (lhs, rhs) = command.args.split_at(redirect_pos);
+    let (Token::Operator(Operator::Redirect(redirect_token)), rhs) = rhs.split_first().unwrap()
+    else {
+        panic!()
+    };
+    (
+        SimpleCommand {
+            location: command.location.clone(),
+            args: lhs.to_vec(),
+        },
+        *redirect_token,
+        rhs,
+    )
+}
+
+#[derive(Clone, MyFromStrParse, Debug)]
+pub enum SimpleCommandType {
+    Builtin(BuiltinCommand),
+    External(PathBuf),
+}
+
+impl From<Token> for SimpleCommandType {
+    fn from(token: Token) -> Self {
+        token.to_string().parse().unwrap()
+    }
+}
+
+impl std::fmt::Display for SimpleCommandType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let displayed = match self {
+            SimpleCommandType::Builtin(builtin_command) => builtin_command.to_string(),
+            SimpleCommandType::External(path_buf) => path_buf.to_string_lossy().into_owned(),
+        };
+        write!(f, "{}", displayed)
+    }
+}
+
+impl From<&Token> for SimpleCommandType {
+    fn from(token: &Token) -> Self {
+        match BuiltinCommand::try_from(token.to_string().as_str()) {
+            Ok(a) => SimpleCommandType::Builtin(a),
+            Err(_) => {
+                let path_buf: PathBuf = token.to_string().into();
+                Self::External(path_buf)
+            }
+        }
+    }
+}

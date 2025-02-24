@@ -1,18 +1,29 @@
+use my_derives::MyFromStrParse;
+use strum::IntoStaticStr;
+
 use crate::PATH;
 use std::convert::TryFrom;
 use std::path::Path;
+use std::process::ExitStatus;
 
+/// "A command that is implemented internally by the shell itself, rather than by an executable program somewhere in the file system."
+///
+/// -- [ref manual](https://www.gnu.org/software/bash/manual/bash.html#index-builtin-1)
+#[derive(Clone, MyFromStrParse, IntoStaticStr, strum::Display, Debug)]
 pub(crate) enum BuiltinCommand {
+    #[strum(serialize = "echo")]
     Echo,
+    #[strum(serialize = "type")]
     Type,
+    #[strum(serialize = "exit")]
     Exit,
 }
 
 impl BuiltinCommand {
-    pub(crate) fn run_with<S, I>(&self, args: I)
+    pub(crate) fn run_with<S, I>(&self, args: I) -> ExitStatus
     where
         I: IntoIterator<Item = S>,
-        S: AsRef<str> + ToString,
+        S: ToString,
     {
         let mut args_iter = args.into_iter();
         match self {
@@ -25,22 +36,21 @@ impl BuiltinCommand {
             ),
             BuiltinCommand::Type => {
                 if let Some(first) = args_iter.next() {
-                    let first = first.as_ref();
-                    if BuiltinCommand::try_from(first).is_ok() {
+                    let first = first.to_string();
+                    if BuiltinCommand::try_from(first.as_str()).is_ok() {
                         println!("{first} is a shell builtin");
-                        return;
-                    }
-                    if let Some(path) = first_match_in_path(first) {
+                    } else if let Some(path) = first_match_in_path(first.as_str()) {
                         println!("{} is {}", first, path.display());
-                        return;
+                    } else {
+                        println!("{first}: not found");
                     }
-                    println!("{first}: not found")
                 } else {
                     unimplemented!()
                 }
             }
             BuiltinCommand::Exit => unimplemented!(),
         }
+        ExitStatus::default()
     }
 }
 
