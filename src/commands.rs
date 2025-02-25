@@ -234,7 +234,7 @@ impl SimpleCommand {
                             let mut file = OpenOptions::new()
                                 .write(true)
                                 .create(true)
-                                .truncate(matches!(out_redirect, RO::AppendStdout))
+                                .append(matches!(out_redirect, RO::AppendStdout))
                                 .open(path)
                                 .unwrap();
                             file.write_all(match out_redirect {
