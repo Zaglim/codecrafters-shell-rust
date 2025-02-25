@@ -203,7 +203,7 @@ impl SimpleCommand {
         {
             let (lhs, operator, rhs) = split_redirect(self);
             match operator {
-                out_redirect @ (RO::RStdout | RO::RStderr) => {
+                out_redirect @ (RO::RStdout | RO::RStderr | RO::AppendStdout) => {
                     let path = PathBuf::from_str(&rhs.last().unwrap().to_string()[..]).unwrap();
 
                     let mut command = std::process::Command::new(lhs.location.to_string());
@@ -211,13 +211,13 @@ impl SimpleCommand {
                     command.args(lhs.args.iter().map(|arg| arg.to_string()));
 
                     match out_redirect {
-                        RedirectOperator::RStdout => {
+                        RO::RStdout | RO::AppendStdout => {
                             command.stdout(Stdio::piped());
                         }
-                        RedirectOperator::RStderr => {
+                        RO::RStderr => {
                             command.stderr(Stdio::piped());
                         }
-                        RedirectOperator::RStdin => unreachable!(),
+                        RO::RStdin => unreachable!(),
                     }
 
                     let evaluated_lhs = match command.spawn() {
@@ -234,11 +234,11 @@ impl SimpleCommand {
                             let mut file = OpenOptions::new()
                                 .write(true)
                                 .create(true)
-                                .truncate(true)
+                                .truncate(matches!(out_redirect, RO::AppendStdout))
                                 .open(path)
                                 .unwrap();
                             file.write_all(match out_redirect {
-                                RO::RStdout => &stdout[..],
+                                RO::RStdout | RO::AppendStdout => &stdout[..],
                                 RO::RStderr => &stderr[..],
                                 RO::RStdin => unreachable!(),
                             })

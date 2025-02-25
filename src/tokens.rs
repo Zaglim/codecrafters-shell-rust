@@ -13,6 +13,8 @@ pub enum RedirectOperator {
     RStdout,
     #[strum(serialize = "2>")]
     RStderr,
+    #[strum(serialize = ">>", serialize = "1>>")]
+    AppendStdout,
 }
 
 /// pure delimiters while outside of token
