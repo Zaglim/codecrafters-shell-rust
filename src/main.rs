@@ -6,7 +6,7 @@ use crate::commands::{Command, CommandStream, SimpleCommand};
 use crate::tokens::*;
 use builtin_commands::BuiltinCommand;
 use commands::SimpleCommandType;
-use log::{info, max_level, LevelFilter};
+use log::info;
 use once_cell::sync::Lazy;
 use std::io::Write;
 use std::io::{self};
@@ -63,6 +63,7 @@ fn read_line() -> String {
 fn main() -> ExitCode {
     #[cfg(debug_assertions)]
     {
+        use log::{max_level, LevelFilter};
         colog::default_builder()
             .filter_level(LevelFilter::Trace)
             .init();

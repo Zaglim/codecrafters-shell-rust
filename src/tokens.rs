@@ -1,39 +1,28 @@
+use std::borrow::Borrow;
+
 use my_derives::{FromInnerType, MayStartWith, MyFromStrParse, ZDisplay};
 
-use strum::{EnumIter, EnumString, IntoStaticStr};
-
-#[derive(Debug, Clone, FromInnerType, MyFromStrParse)]
-pub enum OperatorChar {
-    ControlCharacter(ControlCharacter),
-    RedirectCharacter(RedirectCharacter),
-}
+use strum::{EnumString, IntoStaticStr};
+type CO = ControlOperator;
 
 #[derive(Debug, Clone, Copy, IntoStaticStr, EnumString, MayStartWith, ZDisplay)]
-pub enum RedirectCharacter {
+pub enum RedirectOperator {
     #[strum(serialize = "<")]
-    LessThan,
+    RStdin,
     #[strum(serialize = ">", serialize = "1>")]
-    GreaterThan,
+    RStdout,
+    #[strum(serialize = "2>")]
+    RStderr,
 }
 
-/// Seperates words. Some are delimiters, others should be retained as tokens
-#[derive(Debug, Clone, FromInnerType, MyFromStrParse)]
-pub enum Metacharacter {
-    OperatorCharacter(OperatorChar),
-    Blank(Blank),
+/// pure delimiters while outside of token
+#[inline]
+pub fn is_blank(c: impl Borrow<char>) -> bool {
+    [' ', '\t'].contains(c.borrow())
 }
 
-/// Not important. Can be deleted once solved the issue
-#[derive(Debug, Clone, IntoStaticStr, EnumIter, MyFromStrParse, ZDisplay)]
-pub enum Blank {
-    #[strum(serialize = " ")]
-    Space,
-    #[strum(serialize = "\t")]
-    Tab,
-}
-
-#[derive(Debug, Clone, Copy, EnumIter, IntoStaticStr, MyFromStrParse, MayStartWith, ZDisplay)]
-pub enum ControlCharacter {
+#[derive(Debug, Clone, Copy, MyFromStrParse, MayStartWith, IntoStaticStr, ZDisplay)]
+pub enum ControlOperator {
     #[strum(serialize = "\n")]
     Newline,
     #[strum(serialize = "&")]
@@ -46,16 +35,6 @@ pub enum ControlCharacter {
     OpenBracket,
     #[strum(serialize = ")")]
     CloseBracket,
-}
-
-#[derive(Debug, Clone, Copy, FromInnerType, MyFromStrParse, MayStartWith, ZDisplay)]
-pub enum ControlOperator {
-    ControlCharacter(ControlCharacter),
-    ControlLong(ControlLong),
-}
-
-#[derive(Debug, Clone, Copy, IntoStaticStr, EnumIter, MyFromStrParse, MayStartWith, ZDisplay)]
-pub enum ControlLong {
     #[strum(serialize = "||")]
     Or,
     #[strum(serialize = "&&")]
@@ -96,9 +75,7 @@ impl Token {
     pub fn is_command_delimiter(&self) -> bool {
         matches!(
             self,
-            Token::Operator(Operator::Control(ControlOperator::ControlCharacter(
-                ControlCharacter::Semicolon | ControlCharacter::Newline
-            )))
+            Token::Operator(Operator::Control(CO::Semicolon | CO::Newline | CO::And))
         )
     }
 }
@@ -165,10 +142,4 @@ impl Operator {
     pub fn may_start_with(value: &str) -> bool {
         ControlOperator::may_start_with(value) || RedirectOperator::may_start_with(value)
     }
-}
-
-#[derive(Debug, Clone, Copy, FromInnerType, MyFromStrParse, MayStartWith, ZDisplay)]
-pub enum RedirectOperator {
-    SingleChar(RedirectCharacter),
-    // todo more
 }

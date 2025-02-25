@@ -3,15 +3,17 @@ use my_derives::MyFromStrParse;
 
 use crate::build_quoted;
 use crate::builtin_commands::BuiltinCommand;
-use crate::tokens::{Blank, Operator, RedirectCharacter, RedirectOperator};
+use crate::tokens::{is_blank, Operator, RedirectOperator};
 use crate::Token;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::iter::Peekable;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
-use std::process::{ExitStatus, Output};
+use std::process::{ExitStatus, Output, Stdio};
 use std::str::{Chars, FromStr};
+
+type RO = RedirectOperator;
 
 #[derive(Debug)]
 pub enum Command {
@@ -87,7 +89,7 @@ impl Iterator for TokenStream<'_> {
         while let Some(peeked_char) = self.iter.peek() {
             trace!("peek: {}", peeked_char);
             match peeked_char {
-                w if w.to_string().parse::<Blank>().is_ok() => {
+                w if is_blank(w) => {
                     self.iter.next(); // consume the blank
                     if !token_builder.is_empty() {
                         break;
@@ -189,7 +191,7 @@ pub(crate) struct CompoundCommand {
 #[derive(Debug)]
 pub(crate) struct SimpleCommand {
     pub location: SimpleCommandType,
-    pub args: Vec<Token>,
+    pub args: Box<[Token]>,
 }
 
 impl SimpleCommand {
@@ -201,12 +203,27 @@ impl SimpleCommand {
         {
             let (lhs, operator, rhs) = split_redirect(self);
             match operator {
-                RedirectOperator::SingleChar(RedirectCharacter::GreaterThan) => {
+                out_redirect @ (RO::RStdout | RO::RStderr) => {
                     let path = PathBuf::from_str(&rhs.last().unwrap().to_string()[..]).unwrap();
 
-                    let evaluated_lhs = std::process::Command::new(lhs.location.to_string())
-                        .args(lhs.args.iter().map(|arg| arg.to_string()))
-                        .output();
+                    let mut command = std::process::Command::new(lhs.location.to_string());
+
+                    command.args(lhs.args.iter().map(|arg| arg.to_string()));
+
+                    match out_redirect {
+                        RedirectOperator::RStdout => {
+                            command.stdout(Stdio::piped());
+                        }
+                        RedirectOperator::RStderr => {
+                            command.stderr(Stdio::piped());
+                        }
+                        RedirectOperator::RStdin => unreachable!(),
+                    }
+
+                    let evaluated_lhs = match command.spawn() {
+                        Ok(child) => child.wait_with_output(),
+                        Err(e) => return ExitStatus::from_raw(e.raw_os_error().unwrap_or(-1)),
+                    };
 
                     match evaluated_lhs {
                         Ok(Output {
@@ -220,20 +237,18 @@ impl SimpleCommand {
                                 .truncate(true)
                                 .open(path)
                                 .unwrap();
-                            file.write_all(&stdout[..]).unwrap();
-
-                            if !status.success() {
-                                println!("{}", String::from_utf8_lossy(&stderr).trim_end());
-                            }
+                            file.write_all(match out_redirect {
+                                RO::RStdout => &stdout[..],
+                                RO::RStderr => &stderr[..],
+                                RO::RStdin => unreachable!(),
+                            })
+                            .unwrap();
                             status
                         }
-                        /*
-                        Ok(Output { status, stderr, .. }) => {} //
-                        */
                         Err(_io_err) => todo!(),
                     }
                 }
-                RedirectOperator::SingleChar(RedirectCharacter::LessThan) => todo!(),
+                RO::RStdin => todo!(),
             }
         } else {
             self.run_truly_simple()
@@ -276,7 +291,7 @@ fn split_redirect(command: &SimpleCommand) -> (SimpleCommand, RedirectOperator, 
     (
         SimpleCommand {
             location: command.location.clone(),
-            args: lhs.to_vec(),
+            args: lhs.into(),
         },
         *redirect_token,
         rhs,
