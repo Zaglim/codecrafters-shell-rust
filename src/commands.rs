@@ -203,7 +203,10 @@ impl SimpleCommand {
         {
             let (lhs, operator, rhs) = split_redirect(self);
             match operator {
-                out_redirect @ (RO::RStdout | RO::RStderr | RO::AppendStdout) => {
+                RO::RStdin => unimplemented!(),
+
+                out_redirect
+                @ (RO::RStdout | RO::RStderr | RO::AppendStdout | RO::AppendStderr) => {
                     let path = PathBuf::from_str(&rhs.last().unwrap().to_string()[..]).unwrap();
 
                     let mut command = std::process::Command::new(lhs.location.to_string());
@@ -214,18 +217,18 @@ impl SimpleCommand {
                         RO::RStdout | RO::AppendStdout => {
                             command.stdout(Stdio::piped());
                         }
-                        RO::RStderr => {
+                        RO::RStderr | RO::AppendStderr => {
                             command.stderr(Stdio::piped());
                         }
                         RO::RStdin => unreachable!(),
                     }
 
-                    let evaluated_lhs = match command.spawn() {
+                    let output_lhs = match command.spawn() {
                         Ok(child) => child.wait_with_output(),
                         Err(e) => return ExitStatus::from_raw(e.raw_os_error().unwrap_or(-1)),
                     };
 
-                    match evaluated_lhs {
+                    match output_lhs {
                         Ok(Output {
                             status,
                             stdout,
@@ -234,12 +237,12 @@ impl SimpleCommand {
                             let mut file = OpenOptions::new()
                                 .write(true)
                                 .create(true)
-                                .append(matches!(out_redirect, RO::AppendStdout))
+                                .append(matches!(out_redirect, RO::AppendStdout | RO::AppendStderr))
                                 .open(path)
                                 .unwrap();
                             file.write_all(match out_redirect {
                                 RO::RStdout | RO::AppendStdout => &stdout[..],
-                                RO::RStderr => &stderr[..],
+                                RO::RStderr | RO::AppendStderr => &stderr[..],
                                 RO::RStdin => unreachable!(),
                             })
                             .unwrap();
@@ -248,7 +251,6 @@ impl SimpleCommand {
                         Err(_io_err) => todo!(),
                     }
                 }
-                RO::RStdin => todo!(),
             }
         } else {
             self.run_truly_simple()
