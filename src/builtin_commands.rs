@@ -10,9 +10,7 @@ use std::process::ExitStatus;
 /// "A command that is implemented internally by the shell itself, rather than by an executable program somewhere in the file system."
 ///
 /// -- [ref manual](https://www.gnu.org/software/bash/manual/bash.html#index-builtin-1)
-#[derive(
-    Clone, MyFromStrParse, IntoStaticStr, strum::Display, Debug, rustyline::Completer, EnumIter,
-)]
+#[derive(Clone, MyFromStrParse, IntoStaticStr, strum::Display, Debug, EnumIter)]
 pub(crate) enum BuiltinCommand {
     #[strum(serialize = "echo")]
     Echo,

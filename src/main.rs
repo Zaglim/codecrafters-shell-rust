@@ -10,7 +10,7 @@ use completion::MyCompleter;
 use once_cell::sync::Lazy;
 use rustyline::error::ReadlineError;
 
-pub static PATH: Lazy<Box<str>> = Lazy::new(|| std::env::var("PATH").unwrap().into_boxed_str());
+pub static PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
 
 fn main() -> Result<(), anyhow::Error> {
     #[cfg(debug_assertions)] // logging setup
@@ -26,7 +26,6 @@ fn main() -> Result<(), anyhow::Error> {
             max_level()
         );
     }
-
     let completer = MyCompleter::default();
     let mut rl = rustyline::Editor::new()?;
     rl.set_helper(Some(completer));
