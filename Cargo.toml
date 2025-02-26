@@ -14,4 +14,5 @@ strum = { version = "0.27.1", features = ["derive"] }
 log = "0.4.26"
 colog = "1.3.0"
 
+rustyline = { version = "15.0.0", features = ["derive"] }
 my_derives = { path = "src/my_derives" }

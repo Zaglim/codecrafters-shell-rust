@@ -1,15 +1,18 @@
 use my_derives::MyFromStrParse;
-use strum::IntoStaticStr;
+use strum::{Display, EnumIter, IntoStaticStr};
 
 use crate::PATH;
 use std::convert::TryFrom;
+use std::io;
 use std::path::Path;
 use std::process::ExitStatus;
 
 /// "A command that is implemented internally by the shell itself, rather than by an executable program somewhere in the file system."
 ///
 /// -- [ref manual](https://www.gnu.org/software/bash/manual/bash.html#index-builtin-1)
-#[derive(Clone, MyFromStrParse, IntoStaticStr, strum::Display, Debug)]
+#[derive(
+    Clone, MyFromStrParse, IntoStaticStr, strum::Display, Debug, rustyline::Completer, EnumIter,
+)]
 pub(crate) enum BuiltinCommand {
     #[strum(serialize = "echo")]
     Echo,
@@ -19,8 +22,15 @@ pub(crate) enum BuiltinCommand {
     Exit,
 }
 
+#[derive(Debug, Display)]
+pub enum CustomError {
+    Exit,
+}
+
+impl std::error::Error for CustomError {}
+
 impl BuiltinCommand {
-    pub(crate) fn run_with<S, I>(&self, args: I) -> ExitStatus
+    pub(crate) fn run_with<S, I>(&self, args: I) -> io::Result<ExitStatus>
     where
         I: IntoIterator<Item = S>,
         S: ToString,
@@ -48,9 +58,9 @@ impl BuiltinCommand {
                     unimplemented!()
                 }
             }
-            BuiltinCommand::Exit => unimplemented!(),
+            BuiltinCommand::Exit => return Err(io::Error::other(CustomError::Exit)),
         }
-        ExitStatus::default()
+        Ok(ExitStatus::default())
     }
 }
 

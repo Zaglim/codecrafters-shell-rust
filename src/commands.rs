@@ -1,12 +1,10 @@
-use log::{debug, info, trace};
 use my_derives::MyFromStrParse;
 
-use crate::build_quoted;
 use crate::builtin_commands::BuiltinCommand;
 use crate::tokens::{is_blank, Operator, RedirectOperator};
 use crate::Token;
 use std::fs::OpenOptions;
-use std::io::Write;
+use std::io::{self, Write};
 use std::iter::Peekable;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
@@ -14,6 +12,40 @@ use std::process::{ExitStatus, Output, Stdio};
 use std::str::{Chars, FromStr};
 
 type RO = RedirectOperator;
+
+/// Progresses the iterator until it reaches the `delimiter`.
+/// After returning, `iter` will have progressed passed the delimiter
+/// # Ok
+/// wraps the progressed slice (excluding the delimiter) in an `Ok`
+/// # Err
+/// wraps the progressed slice in an `Err` if end of iterator is reached
+fn build_quoted(iter: &mut Peekable<Chars>) -> Result<String, String> {
+    let original: String = iter.clone().collect();
+
+    let mut build = String::new();
+    let delimiter = iter.next().unwrap();
+
+    while let Some(char) = iter.next() {
+        match char {
+            _ if char == delimiter => return Ok(build),
+            '\\' if delimiter == '"' => {
+                build.push_str(proccess_escape_in_double_quote(iter).as_str())
+            }
+            _ => build.push(char),
+        }
+    }
+    Err(original)
+}
+
+fn proccess_escape_in_double_quote(iter: &mut Peekable<Chars>) -> String {
+    match iter.next() {
+        None => {
+            todo!("determine what to do when BACKSLASH is the last in the stream")
+        }
+        Some(c @ ('$' | '\\' | '"')) => c.into(),
+        Some(c) => ['\\', c].iter().collect(),
+    }
+}
 
 #[derive(Debug)]
 pub enum Command {
@@ -23,7 +55,7 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn run_blocking(&self) -> ExitStatus {
+    pub fn run_blocking(&self) -> io::Result<ExitStatus> {
         match self {
             Command::Simple(simple_command) => simple_command.run_blocking(),
             Command::Compound(_compound) => todo!(),
@@ -87,7 +119,7 @@ impl Iterator for TokenStream<'_> {
         let mut token_builder = String::new();
 
         while let Some(peeked_char) = self.iter.peek() {
-            trace!("peek: {}", peeked_char);
+            log::trace!("peek: {}", peeked_char);
             match peeked_char {
                 w if is_blank(w) => {
                     self.iter.next(); // consume the blank
@@ -125,13 +157,13 @@ impl Iterator for TokenStream<'_> {
                 },
                 _ => token_builder.push(self.iter.next().unwrap()),
             }
-            info!("token_builder = {token_builder}");
+            log::info!("token_builder = {token_builder}");
         }
         if token_builder.is_empty() {
             return None;
         }
         let token = token_builder.into();
-        debug!("returning token: {token}");
+        log::info!("returning token: {token}");
 
         Some(token)
     }
@@ -195,7 +227,7 @@ pub(crate) struct SimpleCommand {
 }
 
 impl SimpleCommand {
-    pub fn run_blocking(&self) -> ExitStatus {
+    pub fn run_blocking(&self) -> io::Result<ExitStatus> {
         if self
             .args
             .iter()
@@ -225,7 +257,7 @@ impl SimpleCommand {
 
                     let output_lhs = match command.spawn() {
                         Ok(child) => child.wait_with_output(),
-                        Err(e) => return ExitStatus::from_raw(e.raw_os_error().unwrap_or(-1)),
+                        Err(e) => return Ok(ExitStatus::from_raw(e.raw_os_error().unwrap_or(-1))),
                     };
 
                     match output_lhs {
@@ -246,7 +278,7 @@ impl SimpleCommand {
                                 RO::RStdin => unreachable!(),
                             })
                             .unwrap();
-                            status
+                            Ok(status)
                         }
                         Err(_io_err) => todo!(),
                     }
@@ -257,7 +289,7 @@ impl SimpleCommand {
         }
     }
 
-    fn run_truly_simple(&self) -> ExitStatus {
+    fn run_truly_simple(&self) -> io::Result<ExitStatus> {
         match &self.location {
             SimpleCommandType::Builtin(built_in) => built_in.run_with(&self.args),
             SimpleCommandType::External(path) => {
@@ -267,10 +299,10 @@ impl SimpleCommand {
                     .spawn();
 
                 match run_attempt {
-                    Ok(mut child) => child.wait().unwrap(),
+                    Ok(mut child) => child.wait(),
                     Err(_) => {
                         eprintln!("{}: command not found", &path.to_string_lossy());
-                        ExitStatus::from_raw(0)
+                        Ok(ExitStatus::from_raw(0))
                     }
                 }
             }
