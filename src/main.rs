@@ -8,7 +8,7 @@ use crate::tokens::*;
 use builtin_commands::{BuiltinCommand, CustomError};
 use completion::MyCompleter;
 use once_cell::sync::Lazy;
-use rustyline::error::ReadlineError;
+use rustyline::{config::Configurer, error::ReadlineError, CompletionType};
 
 pub static PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
 
@@ -29,6 +29,7 @@ fn main() -> Result<(), anyhow::Error> {
     let completer = MyCompleter::default();
     let mut rl = rustyline::Editor::new()?;
     rl.set_helper(Some(completer));
+    rl.set_completion_type(CompletionType::List);
 
     loop {
         let raw_input = match rl.readline("$ ").map(|s| s + "\n") {
