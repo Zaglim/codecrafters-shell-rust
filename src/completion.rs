@@ -4,7 +4,7 @@ use rustyline::completion::Completer;
 use rustyline::{Helper, Highlighter, Hinter, Validator};
 use strum::IntoEnumIterator;
 
-use crate::{BuiltinCommand, PATH};
+use crate::BuiltinCommand;
 
 #[derive(Helper, Hinter, Highlighter, Validator)]
 pub struct MyCompleter {
@@ -14,30 +14,23 @@ pub struct MyCompleter {
 impl MyCompleter {
     pub fn default() -> Self {
         let path_executables = get_path_executables();
-        #[cfg(debug_assertions)]
-        dbg!(&path_executables);
 
         Self {
             commands: BuiltinCommand::iter()
-                .map(|s| s.to_string().into_boxed_str())
-                .chain(path_executables)
                 .map(|s| s.to_string())
+                .chain(path_executables)
                 .collect(),
         }
     }
 }
 
-fn get_path_executables() -> Vec<Box<str>> {
-    std::env::split_paths(&PATH.to_string())
+fn get_path_executables() -> Box<[String]> {
+    std::env::split_paths(&std::env::var("PATH").unwrap())
         .filter_map(|path| {
             Some(
                 path.read_dir()
                     .ok()?
-                    .filter_map(|entry| {
-                        let name = entry.ok()?.file_name().into_string().ok()?.into_boxed_str();
-                        Some(name)
-                    })
-                    .collect::<Vec<_>>(),
+                    .filter_map(|entry| entry.ok()?.file_name().into_string().ok()),
             )
         })
         .flatten()
@@ -54,16 +47,20 @@ impl Completer for MyCompleter {
         ctx: &rustyline::Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
         _ = (pos, ctx);
-        let mut possible: Vec<_> = self
+        let mut candidates: Vec<_> = self
             .commands
             .iter()
             .filter(|c| c.starts_with(line))
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
             .collect();
 
-        possible.sort();
+        candidates.sort();
 
-        Ok((0, possible))
+        if candidates.len() == 1 {
+            candidates[0].push(' '); // add a space because the word is completed
+        }
+
+        Ok((0, candidates))
     }
 
     fn update(
@@ -73,8 +70,7 @@ impl Completer for MyCompleter {
         elected: &str,
         cl: &mut rustyline::Changeset,
     ) {
-        let text = elected.to_string() + " ";
-        // todo!(" add space at end");
+        let text = elected.to_string();
         let end = line.pos();
         line.replace(start..end, text.as_str(), cl);
     }

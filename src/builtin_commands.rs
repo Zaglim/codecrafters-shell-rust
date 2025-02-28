@@ -1,9 +1,7 @@
 use my_derives::MyFromStrParse;
 use strum::{Display, EnumIter, IntoStaticStr};
 
-use crate::PATH;
 use std::convert::TryFrom;
-use std::io;
 use std::path::Path;
 use std::process::ExitStatus;
 
@@ -21,6 +19,7 @@ pub(crate) enum BuiltinCommand {
 }
 
 #[derive(Debug, Display)]
+//
 pub enum CustomError {
     Exit,
 }
@@ -28,7 +27,7 @@ pub enum CustomError {
 impl std::error::Error for CustomError {}
 
 impl BuiltinCommand {
-    pub(crate) fn run_with<S, I>(&self, args: I) -> io::Result<ExitStatus>
+    pub(crate) fn run_with<S, I>(&self, args: I) -> anyhow::Result<ExitStatus>
     where
         I: IntoIterator<Item = S>,
         S: ToString,
@@ -56,7 +55,7 @@ impl BuiltinCommand {
                     unimplemented!()
                 }
             }
-            BuiltinCommand::Exit => return Err(io::Error::other(CustomError::Exit)),
+            BuiltinCommand::Exit => return Err(CustomError::Exit.into()),
         }
         Ok(ExitStatus::default())
     }
@@ -66,18 +65,17 @@ impl TryFrom<&str> for BuiltinCommand {
     type Error = ();
 
     fn try_from(value: &str) -> Result<BuiltinCommand, Self::Error> {
-        use BuiltinCommand::*;
         match value {
-            "echo" => Ok(Echo),
-            "type" => Ok(Type),
-            "exit" => Ok(Exit),
+            "echo" => Ok(BuiltinCommand::Echo),
+            "type" => Ok(BuiltinCommand::Type),
+            "exit" => Ok(BuiltinCommand::Exit),
             _ => Err(()),
         }
     }
 }
 
 fn first_match_in_path(name: &str) -> Option<Box<Path>> {
-    for path_str in PATH.split(':') {
+    for path_str in std::env::var("PATH").unwrap().split(':') {
         let path_buf = Path::new(path_str).join(name);
         if path_buf.is_file() {
             return Some(Box::from(path_buf));

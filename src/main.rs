@@ -4,20 +4,16 @@ mod completion;
 mod tokens;
 
 use crate::commands::CommandStream;
-use crate::tokens::*;
 use builtin_commands::{BuiltinCommand, CustomError};
 use completion::MyCompleter;
-use once_cell::sync::Lazy;
 use rustyline::{config::Configurer, error::ReadlineError, CompletionType};
-
-pub static PATH: Lazy<String> = Lazy::new(|| std::env::var("PATH").unwrap());
 
 fn main() -> Result<(), anyhow::Error> {
     #[cfg(debug_assertions)] // logging setup
     {
         use log::{max_level, LevelFilter};
         colog::default_builder()
-            .filter_level(LevelFilter::Warn)
+            .filter_level(LevelFilter::Info)
             .init();
 
         log::log!(
@@ -44,24 +40,12 @@ fn main() -> Result<(), anyhow::Error> {
         for command_construction_result in CommandStream::from(&raw_input) {
             #[cfg(debug_assertions)]
             dbg!(&command_construction_result);
-
             match command_construction_result {
                 Ok(command) => {
-                    // if command.is_exit() {
-                    //     return Ok(());
-                    // }
-
-                    _ = match command.run_blocking() {
+                    match command.run_blocking() {
                         Ok(status) => status,
-                        Err(err) => {
-                            // Get the downcasted error type
-                            let downcast = err.downcast::<CustomError>();
-
-                            return match downcast {
-                                Ok(CustomError::Exit) => Ok(()),
-                                Err(err) => Err(err.into()),
-                            };
-                        }
+                        Err(e) if e.is::<CustomError>() => return Ok(()),
+                        Err(err) => return Err(err),
                     };
                 }
                 Err(commands::CommandConstructionError::NoCommand) => println!(),

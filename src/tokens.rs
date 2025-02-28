@@ -106,7 +106,7 @@ impl From<&str> for Word {
     fn from(value: &str) -> Self {
         match value.parse() {
             Ok(rw) => Self::ReservedWord(rw),
-            Err(_) => Self::SimpleWord(value.to_string()),
+            Err(()) => Self::SimpleWord(value.to_string()),
         }
     }
 }
