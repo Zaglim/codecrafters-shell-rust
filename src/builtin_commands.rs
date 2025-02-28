@@ -1,7 +1,6 @@
 use my_derives::MyFromStrParse;
 use strum::{Display, EnumIter, IntoStaticStr};
 
-use std::convert::TryFrom;
 use std::fmt::Display;
 use std::path::Path;
 use std::process::ExitStatus;
@@ -36,12 +35,10 @@ impl BuiltinCommand {
         I: IntoIterator<Item = S>,
         S: Display,
     {
-        let arg_strings = args.into_iter().map(|s| s.to_string());
         use BuiltinCommand as BC;
+        let arg_strings = args.into_iter().map(|s| s.to_string());
         match self {
-            BC::Echo => {
-                println!("{}", arg_strings.collect::<Vec<_>>().join(" "))
-            }
+            BC::Echo => println!("{}", arg_strings.collect::<Vec<_>>().join(" ")),
             BC::Type => {
                 for arg in arg_strings {
                     if arg.parse::<BuiltinCommand>().is_ok() {
