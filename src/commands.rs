@@ -351,8 +351,8 @@ impl std::fmt::Display for SimpleCommandType {
 
 impl From<&Token> for SimpleCommandType {
     fn from(token: &Token) -> Self {
-        if let Ok(a) = BuiltinCommand::try_from(token.to_string().as_str()) {
-            SimpleCommandType::Builtin(a)
+        if let Ok(builtin) = token.to_string().parse() {
+            SimpleCommandType::Builtin(builtin)
         } else {
             let path_buf: PathBuf = token.to_string().into();
             Self::External(path_buf)

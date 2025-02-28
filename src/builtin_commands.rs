@@ -2,6 +2,7 @@ use my_derives::MyFromStrParse;
 use strum::{Display, EnumIter, IntoStaticStr};
 
 use std::convert::TryFrom;
+use std::fmt::Display;
 use std::path::Path;
 use std::process::ExitStatus;
 
@@ -16,12 +17,15 @@ pub(crate) enum BuiltinCommand {
     Type,
     #[strum(serialize = "exit")]
     Exit,
+    #[strum(serialize = "pwd")]
+    Pwd,
 }
 
 #[derive(Debug, Display)]
 //
 pub enum CustomError {
     Exit,
+    StringConversionError,
 }
 
 impl std::error::Error for CustomError {}
@@ -30,47 +34,36 @@ impl BuiltinCommand {
     pub(crate) fn run_with<S, I>(&self, args: I) -> anyhow::Result<ExitStatus>
     where
         I: IntoIterator<Item = S>,
-        S: ToString,
+        S: Display,
     {
-        let mut args_iter = args.into_iter();
+        let arg_strings = args.into_iter().map(|s| s.to_string());
+        use BuiltinCommand as BC;
         match self {
-            BuiltinCommand::Echo => println!(
-                "{}",
-                args_iter
-                    .map(|s| s.to_string())
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            ),
-            BuiltinCommand::Type => {
-                if let Some(first) = args_iter.next() {
-                    let first = first.to_string();
-                    if BuiltinCommand::try_from(first.as_str()).is_ok() {
-                        println!("{first} is a shell builtin");
-                    } else if let Some(path) = first_match_in_path(first.as_str()) {
-                        println!("{} is {}", first, path.display());
+            BC::Echo => {
+                println!("{}", arg_strings.collect::<Vec<_>>().join(" "))
+            }
+            BC::Type => {
+                for arg in arg_strings {
+                    if arg.parse::<BuiltinCommand>().is_ok() {
+                        println!("{arg} is a shell builtin");
+                    } else if let Some(path) = first_match_in_path(arg.as_str()) {
+                        println!("{arg} is {}", path.display());
                     } else {
-                        println!("{first}: not found");
+                        println!("{arg}: not found");
                     }
-                } else {
-                    unimplemented!()
                 }
             }
-            BuiltinCommand::Exit => return Err(CustomError::Exit.into()),
+            BC::Pwd => {
+                println!(
+                    "{}",
+                    std::env::current_dir()?
+                        .to_str()
+                        .ok_or(CustomError::StringConversionError)?
+                );
+            }
+            BC::Exit => return Err(CustomError::Exit.into()),
         }
         Ok(ExitStatus::default())
-    }
-}
-
-impl TryFrom<&str> for BuiltinCommand {
-    type Error = ();
-
-    fn try_from(value: &str) -> Result<BuiltinCommand, Self::Error> {
-        match value {
-            "echo" => Ok(BuiltinCommand::Echo),
-            "type" => Ok(BuiltinCommand::Type),
-            "exit" => Ok(BuiltinCommand::Exit),
-            _ => Err(()),
-        }
     }
 }
 
