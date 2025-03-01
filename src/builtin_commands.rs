@@ -1,7 +1,10 @@
 use my_derives::MyFromStrParse;
 use strum::{Display, EnumIter, IntoStaticStr};
 
+use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
+use std::os::unix::ffi::OsStrExt;
+use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 
@@ -61,9 +64,24 @@ impl BuiltinCommand {
                 );
             }
             BC::ChangeDir => {
-                let path: PathBuf = arg_strings.next().unwrap_or(String::new()).into();
-                if std::env::set_current_dir(&path).is_err() {
-                    println!("cd: {}: No such file or directory", &path.to_string_lossy());
+                let mut path: PathBuf = arg_strings.next().unwrap_or(String::new()).into();
+                let mut path_components = path.components();
+                if path_components.next()
+                    == Some(std::path::Component::Normal(&OsString::from("~")))
+                {
+                    let home: PathBuf = std::env::var("HOME").unwrap().into();
+                    path = {
+                        let mut builder = home.clone();
+                        builder.extend(path_components);
+                        builder
+                    }
+                }
+
+                let cd_result = std::env::set_current_dir(&path);
+
+                if cd_result.is_err() {
+                    eprintln!("cd: {}: No such file or directory", &path.to_string_lossy());
+                    return Ok(ExitStatus::from_raw(2));
                 }
             }
             BC::Exit => return Err(CustomError::Exit.into()),
