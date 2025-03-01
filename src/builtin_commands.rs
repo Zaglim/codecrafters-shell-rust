@@ -2,7 +2,7 @@ use my_derives::MyFromStrParse;
 use strum::{Display, EnumIter, IntoStaticStr};
 
 use std::fmt::Display;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 
 /// "A command that is implemented internally by the shell itself, rather than by an executable program somewhere in the file system."
@@ -17,7 +17,9 @@ pub(crate) enum BuiltinCommand {
     #[strum(serialize = "exit")]
     Exit,
     #[strum(serialize = "pwd")]
-    Pwd,
+    PrintWorkingDir,
+    #[strum(serialize = "cd")]
+    ChangeDir,
 }
 
 #[derive(Debug, Display)]
@@ -36,7 +38,7 @@ impl BuiltinCommand {
         S: Display,
     {
         use BuiltinCommand as BC;
-        let arg_strings = args.into_iter().map(|s| s.to_string());
+        let mut arg_strings = args.into_iter().map(|s| s.to_string());
         match self {
             BC::Echo => println!("{}", arg_strings.collect::<Vec<_>>().join(" ")),
             BC::Type => {
@@ -50,13 +52,19 @@ impl BuiltinCommand {
                     }
                 }
             }
-            BC::Pwd => {
+            BC::PrintWorkingDir => {
                 println!(
                     "{}",
                     std::env::current_dir()?
                         .to_str()
                         .ok_or(CustomError::StringConversionError)?
                 );
+            }
+            BC::ChangeDir => {
+                let path: PathBuf = arg_strings.next().unwrap_or(String::new()).into();
+                if std::env::set_current_dir(&path).is_err() {
+                    println!("cd: {}: No such file or directory", &path.to_string_lossy());
+                }
             }
             BC::Exit => return Err(CustomError::Exit.into()),
         }
