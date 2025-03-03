@@ -1,7 +1,7 @@
 use my_derives::MyFromStrParse;
-use strum::{Display, EnumIter, IntoStaticStr};
+use strum::{EnumIter, IntoStaticStr};
 
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::fmt::Display;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::process::ExitStatusExt;
@@ -25,15 +25,6 @@ pub(crate) enum BuiltinCommand {
     ChangeDir,
 }
 
-#[derive(Debug, Display)]
-//
-pub enum CustomError {
-    Exit,
-    StringConversionError,
-}
-
-impl std::error::Error for CustomError {}
-
 impl BuiltinCommand {
     pub(crate) fn run_with<S, I>(&self, args: I) -> anyhow::Result<ExitStatus>
     where
@@ -43,6 +34,7 @@ impl BuiltinCommand {
         use BuiltinCommand as BC;
         let mut arg_strings = args.into_iter().map(|s| s.to_string());
         match self {
+            BC::Exit => std::process::exit(0),
             BC::Echo => println!("{}", arg_strings.collect::<Vec<_>>().join(" ")),
             BC::Type => {
                 for arg in arg_strings {
@@ -56,11 +48,11 @@ impl BuiltinCommand {
                 }
             }
             BC::PrintWorkingDir => {
+                let current_dir = std::env::current_dir()?;
+
                 println!(
                     "{}",
-                    std::env::current_dir()?
-                        .to_str()
-                        .ok_or(CustomError::StringConversionError)?
+                    String::from_utf8(current_dir.as_os_str().as_bytes().to_vec())?
                 );
             }
             BC::ChangeDir => {
@@ -84,7 +76,6 @@ impl BuiltinCommand {
                     return Ok(ExitStatus::from_raw(2));
                 }
             }
-            BC::Exit => return Err(CustomError::Exit.into()),
         }
         Ok(ExitStatus::default())
     }
