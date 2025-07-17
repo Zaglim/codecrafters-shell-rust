@@ -1,12 +1,16 @@
+use crate::executable_path::Executable;
 use my_derives::MyFromStrParse;
+use std::fmt::{Arguments, Debug};
+use std::fs::File;
+use std::io::{Read, Write};
+use std::{fs, io};
 use strum::{EnumIter, IntoStaticStr};
 
-use std::ffi::OsString;
-use std::fmt::Display;
-use std::os::unix::ffi::OsStrExt;
-use std::os::unix::process::ExitStatusExt;
-use std::path::{Path, PathBuf};
-use std::process::ExitStatus;
+use itertools::Itertools;
+use std::{
+    ffi::OsString, fmt::Display, os::unix::process::ExitStatusExt, path::PathBuf,
+    process::ExitStatus,
+};
 
 /// "A command that is implemented internally by the shell itself, rather than by an executable program somewhere in the file system."
 ///
@@ -26,37 +30,51 @@ pub(crate) enum BuiltinCommand {
 }
 
 impl BuiltinCommand {
-    pub(crate) fn run_with<S, I>(&self, args: I) -> anyhow::Result<ExitStatus>
+    pub(crate) fn run_with<S, I>(
+        &self,
+        args: I,
+        mut out_redirect: Option<File>,
+        mut err_redirect: Option<File>,
+    ) -> io::Result<ExitStatus>
     where
-        I: IntoIterator<Item = S>,
-        S: Display,
+        I: IntoIterator<Item = S> + Debug,
+        S: Display + Debug + AsRef<str>,
     {
         use BuiltinCommand as BC;
-        let mut arg_strings = args.into_iter().map(|s| s.to_string());
+
+        let mut args_iter = args.into_iter();
+
         match self {
             BC::Exit => std::process::exit(0),
-            BC::Echo => println!("{}", arg_strings.collect::<Vec<_>>().join(" ")),
+            BC::Echo => {
+                write_stdout(&mut out_redirect, format_args!("{}", args_iter.format(" ")))?;
+            }
             BC::Type => {
-                for arg in arg_strings {
-                    if arg.parse::<BuiltinCommand>().is_ok() {
-                        println!("{arg} is a shell builtin");
-                    } else if let Some(path) = first_match_in_path(arg.as_str()) {
-                        println!("{arg} is {}", path.display());
+                for arg in args_iter {
+                    if arg.as_ref().parse::<BuiltinCommand>().is_ok() {
+                        write_stdout(&mut out_redirect, format_args!("{arg} is a shell builtin"))?;
+                    } else if let Some(path) = arg.as_ref().first_executable_match_in_path() {
+                        write_stdout(
+                            &mut out_redirect,
+                            format_args!("{arg} is {}", path.display()),
+                        )?;
                     } else {
-                        println!("{arg}: not found");
+                        write_stdout(&mut out_redirect, format_args!("{arg}: not found"))?;
                     }
                 }
             }
             BC::PrintWorkingDir => {
                 let current_dir = std::env::current_dir()?;
 
-                println!(
-                    "{}",
-                    String::from_utf8(current_dir.as_os_str().as_bytes().to_vec())?
-                );
+                write_stdout(
+                    &mut out_redirect,
+                    format_args!("{}", current_dir.to_string_lossy()),
+                )?;
             }
             BC::ChangeDir => {
-                let mut path: PathBuf = arg_strings.next().unwrap_or(String::new()).into();
+                let mut path: PathBuf = args_iter
+                    .next()
+                    .map_or(PathBuf::new(), |s| PathBuf::from(s.as_ref()));
                 let mut path_components = path.components();
                 if path_components.next()
                     == Some(std::path::Component::Normal(&OsString::from("~")))
@@ -72,21 +90,43 @@ impl BuiltinCommand {
                 let cd_result = std::env::set_current_dir(&path);
 
                 if cd_result.is_err() {
-                    eprintln!("cd: {}: No such file or directory", &path.to_string_lossy());
+                    write_stderr(
+                        &mut err_redirect,
+                        format_args!("cd: {}: No such file or directory", &path.to_string_lossy()),
+                    )?;
                     return Ok(ExitStatus::from_raw(2));
                 }
             }
         }
-        Ok(ExitStatus::default())
+
+        Ok({
+            log::info!("builtin command executed with success");
+            ExitStatus::default()
+        })
     }
 }
 
-fn first_match_in_path(name: &str) -> Option<Box<Path>> {
-    for path_str in std::env::var("PATH").unwrap().split(':') {
-        let path_buf = Path::new(path_str).join(name);
-        if path_buf.is_file() {
-            return Some(Box::from(path_buf));
+fn write_stdout(redirection: &mut Option<File>, content: Arguments) -> io::Result<()> {
+    match redirection {
+        Some(ref mut file) => {
+            log::info!("writing  to {file:?}");
+            writeln!(file, "{content}")?;
+            file.flush()?;
+            log::info!("successfully wrote to file. File now contains:{:?}", {
+                let mut s = String::new();
+                file.read_to_string(&mut s).unwrap();
+                dbg!(s)
+            });
         }
+        None => println!("{content}"),
     }
-    None
+    Ok(())
+}
+
+fn write_stderr(redirection: &mut Option<File>, content: Arguments) -> io::Result<()> {
+    match redirection {
+        Some(ref mut file) => writeln!(file, "{content}")?,
+        None => eprintln!("{content}"),
+    }
+    Ok(())
 }

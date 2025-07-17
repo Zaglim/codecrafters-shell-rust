@@ -1,18 +1,18 @@
-use my_derives::MyFromStrParse;
+use anyhow::anyhow;
+use std::io;
+use std::os::unix::process::ExitStatusExt;
+use std::path::Path;
 
 use crate::builtin_commands::BuiltinCommand;
-use crate::tokens::{is_blank, Operator, RedirectOperator, Token};
-use std::fs::OpenOptions;
-use std::io::Write;
+use crate::tokens::Operator::Redirect;
+use crate::tokens::{is_shell_blank, Operator, RedirectOperator, Token, Word};
+use itertools::Itertools;
+use std::fs::{File, OpenOptions};
+use std::io::ErrorKind;
 use std::iter::Peekable;
-use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
-use std::process::{ExitStatus, Output, Stdio};
+use std::process::ExitStatus;
 use std::str::Chars;
-
-use CommandConstructionError as Cce;
-use RedirectOperator as ReO;
-use SimpleCommandConstructionError as Scce;
 
 /// Progresses the iterator until it reaches the `delimiter`.
 /// After returning, `iter` will have progressed passed the delimiter
@@ -49,73 +49,17 @@ fn proccess_escape_in_double_quote(iter: &mut Peekable<Chars>) -> String {
     }
 }
 
-#[derive(Debug)]
-pub enum Command {
-    Simple(SimpleCommand),
-}
-
-impl Command {
-    pub fn run_blocking(&self) -> anyhow::Result<ExitStatus> {
-        match self {
-            Command::Simple(simple_command) => simple_command.run_blocking(),
-        }
-    }
-}
-
-impl TryFrom<Vec<Token>> for Command {
-    type Error = CommandConstructionError;
-
-    fn try_from(tokens: Vec<Token>) -> Result<Self, Self::Error> {
-        if tokens
-            .iter()
-            .any(|t| matches!(t, Token::Operator(Operator::Control(_))))
-        {
-            unimplemented!("Compound commands are not implemented")
-        }
-
-        match tokens.try_into() {
-            Ok(simple) => Ok(Command::Simple(simple)),
-            Err(Scce::General(cce)) => Err(cce),
-            Err(_) => unimplemented!("compound commands are not implemented"),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum CommandConstructionError {
-    EmptyInput,
-}
-
-pub enum SimpleCommandConstructionError {
-    General(CommandConstructionError),
-    IncludesControlOperator,
-}
-
-impl TryFrom<Vec<Token>> for SimpleCommand {
-    type Error = SimpleCommandConstructionError;
-
-    fn try_from(tokens: Vec<Token>) -> Result<Self, Self::Error> {
-        if tokens
-            .iter()
-            .any(|t| matches!(t, Token::Operator(Operator::Control(_))))
-        {
-            return Err(Scce::IncludesControlOperator);
-        }
-
-        let (location, args) = tokens.split_first().ok_or(Scce::General(Cce::EmptyInput))?;
-
-        let location = location.into();
-        let args = args.into();
-        Ok(Self { location, args })
-    }
+pub trait Command {
+    fn run_blocking(self) -> io::Result<ExitStatus>;
 }
 
 pub struct CommandStream<'a> {
-    iter: TokenStream<'a>,
+    token_stream: TokenStream<'a>,
 }
 
+#[derive(Clone, Debug)]
 struct TokenStream<'a> {
-    iter: Peekable<Chars<'a>>,
+    chars: Peekable<Chars<'a>>,
 }
 
 impl Iterator for TokenStream<'_> {
@@ -124,17 +68,16 @@ impl Iterator for TokenStream<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut token_builder = String::new();
 
-        while let Some(peeked_char) = self.iter.peek() {
-            log::trace!("peek: {}", peeked_char);
+        while let Some(peeked_char) = self.chars.peek() {
             match peeked_char {
-                w if is_blank(w) => {
-                    self.iter.next(); // consume the blank
+                w if is_shell_blank(w) => {
+                    self.chars.next(); // consume the blank
                     if !token_builder.is_empty() {
                         break;
                     }
                 }
                 meta_c if Operator::may_start_with(meta_c.to_string().as_str()) => {
-                    match try_build_operator(&self.iter) {
+                    match try_build_operator(&self.chars) {
                         Ok(operator) => {
                             if !token_builder.is_empty() {
                                 break;
@@ -142,28 +85,28 @@ impl Iterator for TokenStream<'_> {
 
                             token_builder = operator;
                             for _ in token_builder.chars() {
-                                self.iter.next();
+                                self.chars.next();
                             } // todo replace for loop with returned clone instead? (requires converting while into a loop)
                             break;
                         }
                         Err(()) => {
                             // consume peeked value
                             token_builder
-                                .push(self.iter.next().expect("peeked to confirm is some"));
+                                .push(self.chars.next().expect("peeked to confirm is some"));
                         }
                     }
                 }
                 '\\' => {
-                    _ = self.iter.next();
-                    if let Some(following) = self.iter.next() {
+                    _ = self.chars.next();
+                    if let Some(following) = self.chars.next() {
                         token_builder.push(following);
                     }
                 }
-                '"' | '\'' => match build_quoted(&mut self.iter) {
+                '"' | '\'' => match build_quoted(&mut self.chars) {
                     Ok(s) => token_builder.push_str(&s),
                     Err(ending) => token_builder.push_str(&ending),
                 },
-                _ => token_builder.push(self.iter.next().expect("peeked to confirm is some")),
+                _ => token_builder.push(self.chars.next().expect("peeked to confirm is some")),
             }
         }
         if token_builder.is_empty() {
@@ -190,165 +133,162 @@ fn try_build_operator(iter: &Peekable<Chars>) -> Result<String, ()> {
 }
 
 impl Iterator for CommandStream<'_> {
-    type Item = Result<Command, CommandConstructionError>;
+    type Item = Result<SimpleCommand, anyhow::Error>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut token_buff = Vec::new();
-        for token in self.iter.by_ref() {
-            if token.is_command_delimiter() {
-                break;
+    fn next(&mut self) -> Option<Result<SimpleCommand, anyhow::Error>> {
+        let location = match self.token_stream.next().map(CommandLocation::try_from)? {
+            Ok(location) => location,
+            Err(e) => return Some(Err(e)),
+        };
+        let mut segment_iter = (&mut self.token_stream)
+            .take_while(|t| !t.is_command_delimiter())
+            .peekable();
+
+        let args = (&mut segment_iter)
+            .peeking_take_while(|token| !token.is_redirect_operator())
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+
+        log::debug!("args: {args:?}");
+
+        let (mut stdin, mut stderr, mut stdout) = (None, None, None);
+        if let Some(Token::Operator(Operator::Redirect(redir))) = (&mut segment_iter).next() {
+            log::info!("adding redirect {redir:?}");
+
+            let Some(Ok(location)) = segment_iter.next().map(PathBuf::try_from) else {
+                return Some(Err(anyhow!("expected a path after redirect operator")));
+            };
+
+            let file: File = {
+                match OpenOptions::new()
+                    .create(true)
+                    .read(true)
+                    .write(true)
+                    .append(redir.appends())
+                    .open(location)
+                {
+                    Ok(f) => f,
+                    Err(io_error) => return Some(Err(io_error.into())),
+                }
+            };
+
+            log::info!("redirect with file: {file:?}");
+
+            match redir {
+                RedirectOperator::RStdin => stdin = Some(file),
+                RedirectOperator::RStdout | RedirectOperator::AppendStdout => {
+                    stdout = Some(file);
+                }
+
+                RedirectOperator::RStderr | RedirectOperator::AppendStderr => {
+                    stderr = Some(file);
+                }
             }
-            token_buff.push(token);
         }
-        if token_buff.is_empty() {
-            None
-        } else {
-            Some(Command::try_from(token_buff))
-        }
+
+        let simple_command = SimpleCommand {
+            location,
+            args,
+            stdin,
+            stdout,
+            stderr,
+        };
+
+        Some(Ok(simple_command))
     }
 }
 
 impl<'a, T: AsRef<str>> From<&'a T> for CommandStream<'a> {
     fn from(value: &'a T) -> Self {
         Self {
-            iter: TokenStream {
-                iter: value.as_ref().chars().peekable(),
+            token_stream: TokenStream {
+                chars: value.as_ref().chars().peekable(),
             },
         }
     }
 }
 
+/// a sequence of [`Words`][`crate::tokens::Word`] separated by blanks, terminated by one of the shell’s [`control operators`][`crate::tokens::ControlOperator`]
+///
+/// [ref](https://www.gnu.org/software/bash/manual/bash.html#Simple-Commands-1)
 #[derive(Debug)]
-pub(crate) struct SimpleCommand {
-    pub location: SimpleCommandType,
+pub struct SimpleCommand {
+    pub location: CommandLocation,
     pub args: Box<[Token]>,
+    pub stdin: Option<File>,
+    pub stdout: Option<File>,
+    pub stderr: Option<File>,
 }
 
-impl SimpleCommand {
-    pub fn run_blocking(&self) -> anyhow::Result<ExitStatus> {
-        let Some((lhs, operator, path)) = split_first_redirect(&self.args) else {
-            return self.run_truly_simple();
-        };
-        let mut command = std::process::Command::new(self.location.to_string());
-
-        match operator {
-            ReO::RStdin => unimplemented!(),
-
-            out_redirect
-            @ (ReO::RStdout | ReO::RStderr | ReO::AppendStdout | ReO::AppendStderr) => {
-                command.args(lhs.iter().map(ToString::to_string));
-
-                match out_redirect {
-                    ReO::RStdout | ReO::AppendStdout => {
-                        command.stdout(Stdio::piped());
-                    }
-                    ReO::RStderr | ReO::AppendStderr => {
-                        command.stderr(Stdio::piped());
-                    }
-                    ReO::RStdin => unreachable!(),
-                }
-
-                let Output {
-                    status,
-                    stdout,
-                    stderr,
-                } = match command.spawn() {
-                    Ok(child) => child.wait_with_output(),
-                    Err(e) => return Ok(ExitStatus::from_raw(e.raw_os_error().unwrap_or(-1))),
-                }?;
-
-                let mut file = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .append(matches!(
-                        out_redirect,
-                        ReO::AppendStdout | ReO::AppendStderr
-                    ))
-                    .open(path)?;
-
-                file.write_all(match out_redirect {
-                    ReO::RStdout | ReO::AppendStdout => &stdout[..],
-                    ReO::RStderr | ReO::AppendStderr => &stderr[..],
-                    ReO::RStdin => unreachable!(),
-                })?;
-
-                Ok(status)
+impl Command for SimpleCommand {
+    fn run_blocking(mut self) -> io::Result<ExitStatus> {
+        log::trace!("attempting to run {self:?}");
+        match self.location {
+            CommandLocation::Builtin(bltn_command) => {
+                bltn_command.run_with(self.args, self.stdout, self.stderr)
             }
-        }
-    }
+            CommandLocation::External(external) => {
+                let mut command = std::process::Command::new(&*external);
+                command.args(self.args);
 
-    fn run_truly_simple(&self) -> anyhow::Result<ExitStatus> {
-        match &self.location {
-            SimpleCommandType::Builtin(built_in) => built_in.run_with(&self.args),
-            SimpleCommandType::External(path) => {
-                let mut command = std::process::Command::new(path);
-                let run_attempt = command
-                    .args(self.args.iter().map(ToString::to_string))
-                    .spawn();
-
-                if let Ok(mut child) = run_attempt {
-                    child.wait().map_err(Into::into)
-                } else {
-                    eprintln!("{}: command not found", &path.to_string_lossy());
-                    Ok(ExitStatus::from_raw(0))
+                if let Some(stdin) = self.stdin.take() {
+                    command.stdin(stdin);
+                }
+                if let Some(stdout) = self.stdout {
+                    command.stdout(stdout);
+                }
+                if let Some(stderr) = self.stderr {
+                    command.stderr(stderr);
+                }
+                match command.spawn() {
+                    Ok(mut child) => return child.wait(),
+                    Err(e) if e.kind() == ErrorKind::NotFound => {
+                        eprintln!("{}: command not found", external.to_string_lossy());
+                        return Ok(ExitStatus::from_raw(127));
+                    }
+                    Err(e) => {
+                        log::error!("ERROR SPAWNING PROCESS: {e:?}");
+                        todo!("hanlde other error kind")
+                    }
                 }
             }
         }
     }
 }
 
-fn split_first_redirect(args: &[Token]) -> Option<(&[Token], ReO, PathBuf)> {
-    let redirect_pos = args
-        .iter()
-        .position(|t| matches!(t, Token::Operator(Operator::Redirect(_))))?;
-
-    let lhs = &args[..redirect_pos];
-    let rhs = &args[redirect_pos + 1..];
-
-    let Token::Operator(Operator::Redirect(redirect_token)) = &args[redirect_pos] else {
-        panic!()
-    };
-
-    match redirect_token {
-        ReO::RStdin => unimplemented!(),
-        ReO::RStdout | ReO::RStderr | ReO::AppendStdout | ReO::AppendStderr => {
-            log::warn!("{rhs:?}");
-            assert!(rhs.len() == 1);
-            let path: PathBuf = rhs[0].to_string().into();
-            Some((lhs, *redirect_token, path))
-        }
-    }
-}
-
-#[derive(Clone, MyFromStrParse, Debug)]
-pub enum SimpleCommandType {
+#[derive(Clone, Debug)]
+pub enum CommandLocation {
     Builtin(BuiltinCommand),
-    External(PathBuf),
+    External(Box<Path>),
 }
 
-impl From<Token> for SimpleCommandType {
-    fn from(token: Token) -> Self {
-        token.to_string().parse().unwrap()
+impl TryFrom<&Token> for CommandLocation {
+    type Error = anyhow::Error;
+    fn try_from(token: &Token) -> Result<Self, Self::Error> {
+        if let Token::Word(Word::SimpleWord(string)) = &token {
+            return if let Ok(builtin) = string.parse::<BuiltinCommand>() {
+                Ok(Self::Builtin(builtin))
+            } else {
+                Ok(Self::External(PathBuf::from(string).into_boxed_path()))
+            };
+        }
+
+        Err(anyhow!("Token is not a simple word!"))
+    }
+}
+impl TryFrom<Token> for CommandLocation {
+    type Error = anyhow::Error;
+    fn try_from(token: Token) -> Result<Self, Self::Error> {
+        CommandLocation::try_from(&token)
     }
 }
 
-impl std::fmt::Display for SimpleCommandType {
+impl std::fmt::Display for CommandLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let displayed = match self {
-            SimpleCommandType::Builtin(builtin_command) => builtin_command.to_string(),
-            SimpleCommandType::External(path_buf) => path_buf.to_string_lossy().into_owned(),
+            CommandLocation::Builtin(builtin_command) => builtin_command.to_string(),
+            CommandLocation::External(path_buf) => path_buf.to_string_lossy().into_owned(),
         };
         write!(f, "{displayed}")
-    }
-}
-
-impl From<&Token> for SimpleCommandType {
-    fn from(token: &Token) -> Self {
-        if let Ok(builtin) = token.to_string().parse() {
-            SimpleCommandType::Builtin(builtin)
-        } else {
-            let path_buf: PathBuf = token.to_string().into();
-            Self::External(path_buf)
-        }
     }
 }

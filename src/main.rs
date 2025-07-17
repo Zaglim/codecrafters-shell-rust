@@ -1,9 +1,10 @@
 mod builtin_commands;
 mod commands;
 mod completion;
+mod executable_path;
 mod tokens;
 
-use crate::commands::CommandStream;
+use crate::commands::{Command, CommandStream};
 use builtin_commands::BuiltinCommand;
 use completion::MyCompleter;
 use rustyline::{
@@ -16,25 +17,24 @@ fn main() -> Result<(), anyhow::Error> {
 
     let mut rl = setup_rustyline_editor()?;
 
-    loop {
-        let raw_input = match rl.readline("$ ").map(|s| s + "\n") {
+    'read_line: loop {
+        let raw_input_line = match rl.readline("$ ") {
             Ok(line) => line,
             Err(ReadlineError::Interrupted | ReadlineError::Eof) => return Ok(()),
             Err(err) => return Err(err.into()),
         };
 
-        #[cfg(debug_assertions)]
-        dbg!(&raw_input);
+        let command_stream = CommandStream::from(&raw_input_line);
 
-        for command_construction_result in CommandStream::from(&raw_input) {
-            #[cfg(debug_assertions)]
-            dbg!(&command_construction_result);
-            match command_construction_result {
-                Ok(command) => {
-                    command.run_blocking()?;
+        for command_construction_result in command_stream {
+            let command = match command_construction_result {
+                Err(e) => {
+                    eprintln!("{e}");
+                    continue 'read_line;
                 }
-                Err(commands::CommandConstructionError::EmptyInput) => println!(),
-            }
+                Ok(command) => command,
+            };
+            command.run_blocking()?;
         }
     }
 }
@@ -50,7 +50,8 @@ fn setup_rustyline_editor() -> Result<Editor<impl Helper, FileHistory>, anyhow::
 fn init_logging() {
     use log::{max_level, LevelFilter};
     colog::default_builder()
-        .filter_level(LevelFilter::Info)
+        .filter_module("rustyline", LevelFilter::Off)
+        .filter_level(LevelFilter::Trace)
         .init();
 
     log::log!(

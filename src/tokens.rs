@@ -1,11 +1,10 @@
-use std::borrow::Borrow;
-
 use my_derives::{FromInnerType, MayStartWith, MyFromStrParse, ZDisplay};
+use std::borrow::Borrow;
+use std::ffi::OsStr;
+use std::path::PathBuf;
+use strum::{AsRefStr, EnumString, IntoStaticStr};
 
-use strum::{EnumString, IntoStaticStr};
-type CO = ControlOperator;
-
-#[derive(Debug, Clone, Copy, IntoStaticStr, EnumString, MayStartWith, ZDisplay)]
+#[derive(Debug, Clone, Copy, IntoStaticStr, EnumString, MayStartWith, ZDisplay, AsRefStr)]
 pub enum RedirectOperator {
     #[strum(serialize = "<")]
     RStdin,
@@ -19,13 +18,25 @@ pub enum RedirectOperator {
     AppendStderr,
 }
 
+impl RedirectOperator {
+    #[inline]
+    // passing by value because it is cheap and Self implements copy
+    /// true iff `AppendStdout | AppendStderr`
+    pub fn appends(self) -> bool {
+        matches!(
+            self,
+            RedirectOperator::AppendStdout | RedirectOperator::AppendStderr
+        )
+    }
+}
+
 /// pure delimiters while outside of token
 #[inline]
-pub fn is_blank(c: impl Borrow<char>) -> bool {
+pub fn is_shell_blank(c: impl Borrow<char>) -> bool {
     [' ', '\t'].contains(c.borrow())
 }
 
-#[derive(Debug, Clone, Copy, MyFromStrParse, MayStartWith, IntoStaticStr, ZDisplay)]
+#[derive(Debug, Clone, Copy, MyFromStrParse, MayStartWith, IntoStaticStr, ZDisplay, AsRefStr)]
 pub enum ControlOperator {
     #[strum(serialize = "\n")]
     Newline,
@@ -58,16 +69,48 @@ pub enum ControlOperator {
 /// (excludes Blanks)
 ///
 /// -- [ref manual](https://www.gnu.org/software/bash/manual/bash.html#index-token)
-#[derive(Debug, Clone, ZDisplay, FromInnerType)]
+#[derive(Debug, Clone, ZDisplay)]
 pub enum Token {
     Word(Word),
     Operator(Operator),
 }
 
-impl<T: AsRef<str>> From<T> for Token {
-    fn from(value: T) -> Self {
-        let s: &str = value.as_ref();
+impl AsRef<str> for Token {
+    fn as_ref(&self) -> &str {
+        match self {
+            Token::Word(w) => w.as_ref(),
+            Token::Operator(o) => o.as_ref(),
+        }
+    }
+}
 
+impl TryFrom<Token> for PathBuf {
+    type Error = (); // todo
+
+    /// Checks that the token does not have a special meaning
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let token = Token::from("if");
+    /// assert!(PathBuf::try_from(token).is_err());
+    ///
+    /// let token = Token::from("some_something");
+    /// assert!(PathBuf::try_from(token).is_ok());
+    ///
+    /// let token = Token::from("&&");
+    /// assert!(PathBuf::from(token).is_err());
+    /// ```
+    fn try_from(token: Token) -> Result<Self, Self::Error> {
+        match token {
+            Token::Word(Word::SimpleWord(word)) => Ok(word.into()),
+            _reserved => Err(()),
+        }
+    }
+}
+
+impl From<String> for Token {
+    fn from(s: String) -> Self {
         if let Ok(operator) = s.parse::<Operator>() {
             return Self::Operator(operator);
         }
@@ -75,12 +118,27 @@ impl<T: AsRef<str>> From<T> for Token {
     }
 }
 
+impl AsRef<OsStr> for Token {
+    fn as_ref(&self) -> &OsStr {
+        <Token as AsRef<str>>::as_ref(self).as_ref()
+    }
+}
+
 impl Token {
     pub fn is_command_delimiter(&self) -> bool {
         matches!(
             self,
-            Token::Operator(Operator::Control(CO::Semicolon | CO::Newline | CO::And))
+            Token::Operator(Operator::Control(
+                ControlOperator::Semicolon | ControlOperator::Newline | ControlOperator::And
+            ))
         )
+    }
+    pub fn is_control_operator(&self) -> bool {
+        matches!(self, Token::Operator(Operator::Control(_)))
+    }
+
+    pub fn is_redirect_operator(&self) -> bool {
+        matches!(self, Token::Operator(Operator::Redirect(_)))
     }
 }
 
@@ -96,9 +154,27 @@ pub enum Word {
     SimpleWord(String),
 }
 
-impl From<Word> for &str {
-    fn from(_value: Word) -> Self {
-        todo!()
+impl AsRef<OsStr> for Word {
+    fn as_ref(&self) -> &std::ffi::OsStr {
+        <Word as AsRef<str>>::as_ref(self).as_ref()
+    }
+}
+
+impl AsRef<str> for Word {
+    fn as_ref(&self) -> &str {
+        match self {
+            Word::ReservedWord(r) => r.as_ref(),
+            Word::SimpleWord(s) => s,
+        }
+    }
+}
+
+impl From<String> for Word {
+    fn from(value: String) -> Self {
+        match value.parse() {
+            Ok(rw) => Self::ReservedWord(rw),
+            Err(()) => Self::SimpleWord(value),
+        }
     }
 }
 
@@ -124,7 +200,7 @@ impl std::fmt::Display for Word {
     }
 }
 
-#[derive(Debug, Clone, MyFromStrParse, IntoStaticStr)]
+#[derive(Debug, Clone, MyFromStrParse, IntoStaticStr, AsRefStr)]
 pub enum ReservedWord {
     #[strum(serialize = "if")]
     If,
@@ -140,6 +216,15 @@ pub enum ReservedWord {
 pub enum Operator {
     Control(ControlOperator),
     Redirect(RedirectOperator),
+}
+
+impl AsRef<str> for Operator {
+    fn as_ref(&self) -> &str {
+        match self {
+            Operator::Control(c) => c.as_ref(),
+            Operator::Redirect(r) => r.as_ref(),
+        }
+    }
 }
 
 impl Operator {
