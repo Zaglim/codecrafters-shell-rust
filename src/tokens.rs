@@ -1,6 +1,7 @@
 use my_derives::{FromInnerType, MayStartWith, MyFromStrParse, ZDisplay};
 use std::borrow::Borrow;
 use std::ffi::OsStr;
+use std::fmt::Display;
 use std::path::PathBuf;
 use strum::{AsRefStr, EnumString, IntoStaticStr};
 
@@ -22,11 +23,8 @@ impl RedirectOperator {
     #[inline]
     // passing by value because it is cheap and Self implements copy
     /// true iff `AppendStdout | AppendStderr`
-    pub fn appends(self) -> bool {
-        matches!(
-            self,
-            RedirectOperator::AppendStdout | RedirectOperator::AppendStderr
-        )
+    pub const fn appends(self) -> bool {
+        matches!(self, Self::AppendStdout | Self::AppendStderr)
     }
 }
 
@@ -78,8 +76,8 @@ pub enum Token {
 impl AsRef<str> for Token {
     fn as_ref(&self) -> &str {
         match self {
-            Token::Word(w) => w.as_ref(),
-            Token::Operator(o) => o.as_ref(),
+            Self::Word(w) => w.as_ref(),
+            Self::Operator(o) => o.as_ref(),
         }
     }
 }
@@ -120,25 +118,25 @@ impl From<String> for Token {
 
 impl AsRef<OsStr> for Token {
     fn as_ref(&self) -> &OsStr {
-        <Token as AsRef<str>>::as_ref(self).as_ref()
+        <Self as AsRef<str>>::as_ref(self).as_ref()
     }
 }
 
 impl Token {
-    pub fn is_command_delimiter(&self) -> bool {
+    pub const fn is_command_delimiter(&self) -> bool {
+        use ControlOperator as CO;
+        use Operator::Control;
         matches!(
             self,
-            Token::Operator(Operator::Control(
-                ControlOperator::Semicolon | ControlOperator::Newline | ControlOperator::And
-            ))
+            Self::Operator(Control(CO::Semicolon | CO::Newline | CO::And))
         )
     }
-    pub fn is_control_operator(&self) -> bool {
-        matches!(self, Token::Operator(Operator::Control(_)))
+    pub const fn is_control_operator(&self) -> bool {
+        matches!(self, Self::Operator(Operator::Control(_)))
     }
 
-    pub fn is_redirect_operator(&self) -> bool {
-        matches!(self, Token::Operator(Operator::Redirect(_)))
+    pub const fn is_redirect_operator(&self) -> bool {
+        matches!(self, Self::Operator(Operator::Redirect(_)))
     }
 }
 
@@ -155,16 +153,16 @@ pub enum Word {
 }
 
 impl AsRef<OsStr> for Word {
-    fn as_ref(&self) -> &std::ffi::OsStr {
-        <Word as AsRef<str>>::as_ref(self).as_ref()
+    fn as_ref(&self) -> &OsStr {
+        <Self as AsRef<str>>::as_ref(self).as_ref()
     }
 }
 
 impl AsRef<str> for Word {
     fn as_ref(&self) -> &str {
         match self {
-            Word::ReservedWord(r) => r.as_ref(),
-            Word::SimpleWord(s) => s,
+            Self::ReservedWord(r) => r.as_ref(),
+            Self::SimpleWord(s) => s,
         }
     }
 }
@@ -187,14 +185,14 @@ impl From<&str> for Word {
     }
 }
 
-impl std::fmt::Display for Word {
+impl Display for Word {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                Word::ReservedWord(reserved_word) => <&str>::from(reserved_word).to_string(),
-                Word::SimpleWord(w) => w.to_owned(),
+                Self::ReservedWord(reserved_word) => <&str>::from(reserved_word).to_string(),
+                Self::SimpleWord(w) => w.to_owned(),
             }
         )
     }
@@ -206,6 +204,8 @@ pub enum ReservedWord {
     If,
     #[strum(serialize = "then")]
     Then,
+    #[strum(serialize = "time")]
+    Time,
     // todo
 }
 
@@ -221,8 +221,8 @@ pub enum Operator {
 impl AsRef<str> for Operator {
     fn as_ref(&self) -> &str {
         match self {
-            Operator::Control(c) => c.as_ref(),
-            Operator::Redirect(r) => r.as_ref(),
+            Self::Control(c) => c.as_ref(),
+            Self::Redirect(r) => r.as_ref(),
         }
     }
 }

@@ -2,6 +2,7 @@ mod builtin_commands;
 mod commands;
 mod completion;
 mod executable_path;
+mod stream_target;
 mod tokens;
 
 use crate::commands::{Command, CommandStream};
@@ -27,14 +28,15 @@ fn main() -> Result<(), anyhow::Error> {
         let command_stream = CommandStream::from(&raw_input_line);
 
         for command_construction_result in command_stream {
-            let command = match command_construction_result {
+            let pipeline = match command_construction_result {
                 Err(e) => {
+                    log::warn!("received error: {e:?}");
                     eprintln!("{e}");
                     continue 'read_line;
                 }
                 Ok(command) => command,
             };
-            command.run_blocking()?;
+            pipeline.run_blocking()?;
         }
     }
 }
@@ -47,6 +49,7 @@ fn setup_rustyline_editor() -> Result<Editor<impl Helper, FileHistory>, anyhow::
     Ok(rl)
 }
 
+#[cfg(debug_assertions)]
 fn init_logging() {
     use log::{max_level, LevelFilter};
     colog::default_builder()

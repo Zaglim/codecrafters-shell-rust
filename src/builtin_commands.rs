@@ -1,11 +1,11 @@
 use crate::executable_path::Executable;
 use my_derives::MyFromStrParse;
 use std::fmt::{Arguments, Debug};
-use std::fs::File;
+use std::io;
 use std::io::{Read, Write};
-use std::{fs, io};
 use strum::{EnumIter, IntoStaticStr};
 
+use crate::stream_target::OutStream;
 use itertools::Itertools;
 use std::{
     ffi::OsString, fmt::Display, os::unix::process::ExitStatusExt, path::PathBuf,
@@ -16,7 +16,7 @@ use std::{
 ///
 /// -- [ref manual](https://www.gnu.org/software/bash/manual/bash.html#index-builtin-1)
 #[derive(Clone, MyFromStrParse, IntoStaticStr, strum::Display, Debug, EnumIter)]
-pub(crate) enum BuiltinCommand {
+pub enum BuiltinCommand {
     #[strum(serialize = "echo")]
     Echo,
     #[strum(serialize = "type")]
@@ -33,25 +33,23 @@ impl BuiltinCommand {
     pub(crate) fn run_with<S, I>(
         &self,
         args: I,
-        mut out_redirect: Option<File>,
-        mut err_redirect: Option<File>,
+        mut out_redirect: OutStream,
+        mut err_redirect: OutStream,
     ) -> io::Result<ExitStatus>
     where
         I: IntoIterator<Item = S> + Debug,
         S: Display + Debug + AsRef<str>,
     {
-        use BuiltinCommand as BC;
-
         let mut args_iter = args.into_iter();
 
         match self {
-            BC::Exit => std::process::exit(0),
-            BC::Echo => {
+            Self::Exit => std::process::exit(0),
+            Self::Echo => {
                 write_stdout(&mut out_redirect, format_args!("{}", args_iter.format(" ")))?;
             }
-            BC::Type => {
+            Self::Type => {
                 for arg in args_iter {
-                    if arg.as_ref().parse::<BuiltinCommand>().is_ok() {
+                    if arg.as_ref().parse::<Self>().is_ok() {
                         write_stdout(&mut out_redirect, format_args!("{arg} is a shell builtin"))?;
                     } else if let Some(path) = arg.as_ref().first_executable_match_in_path() {
                         write_stdout(
@@ -63,7 +61,7 @@ impl BuiltinCommand {
                     }
                 }
             }
-            BC::PrintWorkingDir => {
+            Self::PrintWorkingDir => {
                 let current_dir = std::env::current_dir()?;
 
                 write_stdout(
@@ -71,17 +69,17 @@ impl BuiltinCommand {
                     format_args!("{}", current_dir.to_string_lossy()),
                 )?;
             }
-            BC::ChangeDir => {
+            Self::ChangeDir => {
                 let mut path: PathBuf = args_iter
                     .next()
-                    .map_or(PathBuf::new(), |s| PathBuf::from(s.as_ref()));
+                    .map_or_else(PathBuf::new, |s| PathBuf::from(s.as_ref()));
                 let mut path_components = path.components();
                 if path_components.next()
                     == Some(std::path::Component::Normal(&OsString::from("~")))
                 {
                     let home: PathBuf = std::env::var("HOME").unwrap().into();
                     path = {
-                        let mut builder = home.clone();
+                        let mut builder = home;
                         builder.extend(path_components);
                         builder
                     }
@@ -106,9 +104,9 @@ impl BuiltinCommand {
     }
 }
 
-fn write_stdout(redirection: &mut Option<File>, content: Arguments) -> io::Result<()> {
+fn write_stdout(redirection: &mut OutStream, content: Arguments) -> io::Result<()> {
     match redirection {
-        Some(ref mut file) => {
+        OutStream::File(file) => {
             log::info!("writing  to {file:?}");
             writeln!(file, "{content}")?;
             file.flush()?;
@@ -118,15 +116,18 @@ fn write_stdout(redirection: &mut Option<File>, content: Arguments) -> io::Resul
                 dbg!(s)
             });
         }
-        None => println!("{content}"),
+        OutStream::PipeWriter(writer) => writeln!(*writer, "{content}")?,
+        OutStream::Std => println!("{content}"),
     }
     Ok(())
 }
 
-fn write_stderr(redirection: &mut Option<File>, content: Arguments) -> io::Result<()> {
+fn write_stderr(redirection: &mut OutStream, content: Arguments) -> io::Result<()> {
     match redirection {
-        Some(ref mut file) => writeln!(file, "{content}")?,
-        None => eprintln!("{content}"),
+        OutStream::File(file) => writeln!(file, "{content}")?,
+        OutStream::PipeWriter(writer) => writeln!(writer, "{content}")?,
+
+        OutStream::Std => eprintln!("{content}"),
     }
     Ok(())
 }
