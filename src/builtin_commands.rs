@@ -27,6 +27,8 @@ pub enum BuiltinCommand {
     PrintWorkingDir,
     #[strum(serialize = "cd")]
     ChangeDir,
+    #[strum(serialize = "history")]
+    History,
 }
 
 impl BuiltinCommand {
