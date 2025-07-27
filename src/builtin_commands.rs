@@ -6,7 +6,9 @@ use std::io::{Stderr, Stdout, Write};
 use strum::{EnumIter, IntoStaticStr};
 
 use crate::stream_target::OutStream;
+use crate::HISTORY;
 use itertools::Itertools;
+use std::iter::zip;
 use std::{
     ffi::OsString, fmt::Display, os::unix::process::ExitStatusExt, path::PathBuf,
     process::ExitStatus,
@@ -92,7 +94,11 @@ impl BuiltinCommand {
                 }
             }
             Self::History => {
-                todo!()
+                HISTORY.with_borrow(|vec| {
+                    for (num, item) in zip(1.., vec) {
+                        writeln!(out_redirect, "{num:>5} {item}").unwrap(); // todo handle write error
+                    }
+                });
             }
         }
         Ok({

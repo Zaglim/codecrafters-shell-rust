@@ -12,32 +12,40 @@ use rustyline::{
     config::Configurer, error::ReadlineError, history::FileHistory, CompletionType, Editor, Helper,
 };
 
+thread_local! {
+    pub static HISTORY: std::cell::RefCell<Vec<String>> = const {std::cell::RefCell::new(Vec::new())};
+}
+
 fn main() -> Result<(), anyhow::Error> {
     #[cfg(debug_assertions)] // logging setup
     init_logging();
 
     let mut rl = setup_rustyline_editor()?;
 
-    'read_line: loop {
+    loop {
         let raw_input_line = match rl.readline("$ ") {
             Ok(line) => line,
             Err(ReadlineError::Interrupted | ReadlineError::Eof) => return Ok(()),
             Err(err) => return Err(err.into()),
         };
+        HISTORY.with_borrow_mut(|v| v.push(raw_input_line));
+        HISTORY.with_borrow(|v| {
+            let latest = v.last().unwrap();
 
-        let command_stream = CommandStream::from(&raw_input_line);
+            let command_stream = CommandStream::from(latest);
 
-        for command_construction_result in command_stream {
-            let pipeline = match command_construction_result {
-                Err(e) => {
-                    log::warn!("received error: {e:?}");
-                    eprintln!("{e}");
-                    continue 'read_line;
-                }
-                Ok(command) => command,
-            };
-            pipeline.run_blocking()?;
-        }
+            for command_construction_result in command_stream {
+                let pipeline = match command_construction_result {
+                    Err(e) => {
+                        log::warn!("received error: {e:?}");
+                        eprintln!("{e}");
+                        break;
+                    }
+                    Ok(command) => command,
+                };
+                pipeline.run_blocking().unwrap();
+            }
+        });
     }
 }
 
