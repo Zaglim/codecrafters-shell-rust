@@ -14,8 +14,8 @@
     <list default="true" id="c0f0c301-2647-45fb-8f56-deb6b1a8cb2b" name="Changes" comment="Redirect now working after major refactoring. Pipes are unimplemented">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/builtin_commands.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/builtin_commands.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/commands.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/commands.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/stream_target.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/stream_target.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/tokens.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/tokens.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -136,7 +136,7 @@
       <workItem from="1753142677503" duration="14940000" />
       <workItem from="1753311914069" duration="6664000" />
       <workItem from="1753574581484" duration="1381000" />
-      <workItem from="1753587318093" duration="3273000" />
+      <workItem from="1753587318093" duration="7275000" />
     </task>
     <task id="LOCAL-00001" summary="Redirect now working after major refactoring. Pipes are unimplemented">
       <option name="closed" value="true" />

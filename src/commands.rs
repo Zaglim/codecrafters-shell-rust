@@ -8,7 +8,7 @@ use crate::stream_target::{InStream, OutStream};
 use crate::tokens::Operator::{Control, Redirect};
 use crate::tokens::{is_shell_blank, ControlOperator, Operator, RedirectOperator, Token, Word};
 use std::fs::{File, OpenOptions};
-use std::io::ErrorKind;
+use std::io::{stderr, stdout, ErrorKind, Stderr, Stdout};
 use std::iter::Peekable;
 use std::path::PathBuf;
 use std::process::ExitStatus;
@@ -28,8 +28,8 @@ pub struct SimpleCommand {
     pub location: CommandLocation,
     pub args: Box<[Token]>,
     pub stdin: InStream,
-    pub stdout: OutStream,
-    pub stderr: OutStream,
+    pub stdout: OutStream<Stdout>,
+    pub stderr: OutStream<Stderr>,
 }
 
 pub struct CommandStream<'a> {
@@ -195,7 +195,7 @@ impl Iterator for CommandStream<'_> {
 
         while let Some(first_token) = self.token_stream.next() {
             let stdin = following_reader.take().unwrap_or(InStream::Std);
-            let (mut stdout, mut stderr) = (OutStream::Std, OutStream::Std);
+            let (mut stdout, mut stderr) = (OutStream::Std(stdout()), OutStream::Std(stderr()));
 
             let location = match CommandLocation::try_from(first_token) {
                 Ok(location) => location,
@@ -242,24 +242,6 @@ impl Iterator for CommandStream<'_> {
                             R::RStderr | R::AppendStderr => stderr = OutStream::File(file),
                         }
 
-                        // // It doesn't make j
-                        //
-                        // if self
-                        //     .token_stream
-                        //     .next()
-                        //     .is_some_and(|t| !t.is_command_delimiter())
-                        // {
-                        //     return Some(Err(anyhow!(
-                        //         "expected a command delimiter after {redir} {path_buf:?}"
-                        //     )));
-                        // }
-                        // command_pipeline.push(SimpleCommand {
-                        //     location,
-                        //     args: args.into_boxed_slice(),
-                        //     stdin,
-                        //     stdout,
-                        //     stderr,
-                        // });
                         break 'command;
                     }
                     Operator(Control(Pipe)) => {
@@ -273,13 +255,6 @@ impl Iterator for CommandStream<'_> {
                     other_token => args.push(other_token),
                 }
             }
-
-            // let mut segment_iter =
-            //     (&mut self.token_stream).peeking_take_while(|t| !t.is_control_operator());
-
-            // let (args, redir_option) = collect_until_redir(&mut segment_iter);
-
-            // log::debug!("args: {args:?}");
 
             let simple_command = SimpleCommand {
                 location,

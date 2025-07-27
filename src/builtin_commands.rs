@@ -1,8 +1,8 @@
 use crate::executable_path::Executable;
 use my_derives::MyFromStrParse;
-use std::fmt::{Arguments, Debug};
+use std::fmt::Debug;
 use std::io;
-use std::io::{Read, Write};
+use std::io::{Stderr, Stdout, Write};
 use strum::{EnumIter, IntoStaticStr};
 
 use crate::stream_target::OutStream;
@@ -33,8 +33,8 @@ impl BuiltinCommand {
     pub(crate) fn run_with<S, I>(
         &self,
         args: I,
-        mut out_redirect: OutStream,
-        mut err_redirect: OutStream,
+        mut out_redirect: OutStream<Stdout>,
+        mut err_redirect: OutStream<Stderr>,
     ) -> io::Result<ExitStatus>
     where
         I: IntoIterator<Item = S> + Debug,
@@ -45,29 +45,22 @@ impl BuiltinCommand {
         match self {
             Self::Exit => std::process::exit(0),
             Self::Echo => {
-                write_stdout(&mut out_redirect, format_args!("{}", args_iter.format(" ")))?;
+                write!(out_redirect, "{}", args_iter.format(" "))?;
             }
             Self::Type => {
                 for arg in args_iter {
                     if arg.as_ref().parse::<Self>().is_ok() {
-                        write_stdout(&mut out_redirect, format_args!("{arg} is a shell builtin"))?;
+                        write!(out_redirect, "{arg} is a shell builtin")?;
                     } else if let Some(path) = arg.as_ref().first_executable_match_in_path() {
-                        write_stdout(
-                            &mut out_redirect,
-                            format_args!("{arg} is {}", path.display()),
-                        )?;
+                        write!(out_redirect, "{arg} is {}", path.display(),)?;
                     } else {
-                        write_stdout(&mut out_redirect, format_args!("{arg}: not found"))?;
+                        write!(out_redirect, "{arg}: not found")?;
                     }
                 }
             }
             Self::PrintWorkingDir => {
                 let current_dir = std::env::current_dir()?;
-
-                write_stdout(
-                    &mut out_redirect,
-                    format_args!("{}", current_dir.to_string_lossy()),
-                )?;
+                write!(out_redirect, "{}", current_dir.to_string_lossy())?;
             }
             Self::ChangeDir => {
                 let mut path: PathBuf = args_iter
@@ -88,9 +81,10 @@ impl BuiltinCommand {
                 let cd_result = std::env::set_current_dir(&path);
 
                 if cd_result.is_err() {
-                    write_stderr(
-                        &mut err_redirect,
-                        format_args!("cd: {}: No such file or directory", &path.to_string_lossy()),
+                    write!(
+                        err_redirect,
+                        "cd: {}: No such file or directory",
+                        &path.to_string_lossy(),
                     )?;
                     return Ok(ExitStatus::from_raw(2));
                 }
@@ -102,32 +96,4 @@ impl BuiltinCommand {
             ExitStatus::default()
         })
     }
-}
-
-fn write_stdout(redirection: &mut OutStream, content: Arguments) -> io::Result<()> {
-    match redirection {
-        OutStream::File(file) => {
-            log::info!("writing  to {file:?}");
-            writeln!(file, "{content}")?;
-            file.flush()?;
-            log::info!("successfully wrote to file. File now contains:{:?}", {
-                let mut s = String::new();
-                file.read_to_string(&mut s).unwrap();
-                dbg!(s)
-            });
-        }
-        OutStream::PipeWriter(writer) => writeln!(*writer, "{content}")?,
-        OutStream::Std => println!("{content}"),
-    }
-    Ok(())
-}
-
-fn write_stderr(redirection: &mut OutStream, content: Arguments) -> io::Result<()> {
-    match redirection {
-        OutStream::File(file) => writeln!(file, "{content}")?,
-        OutStream::PipeWriter(writer) => writeln!(writer, "{content}")?,
-
-        OutStream::Std => eprintln!("{content}"),
-    }
-    Ok(())
 }

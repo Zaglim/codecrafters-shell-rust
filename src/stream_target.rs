@@ -1,12 +1,15 @@
 use std::fs::File;
+use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::process::Stdio;
 
+/// simple wrapper over the implementation
 #[derive(Debug)]
 pub struct PipeReader {
     inner: imp::PipeReader,
 }
 
+/// simple wrapper over the implementation
 #[derive(Debug)]
 pub struct PipeWriter {
     inner: imp::PipeWriter,
@@ -30,6 +33,7 @@ impl Deref for PipeWriter {
     }
 }
 
+/// An enum attempting to avoid the need for `dyn Read`
 #[derive(Debug)]
 pub enum InStream {
     Std,
@@ -45,13 +49,29 @@ mod imp {
     pub use std::io::{pipe, PipeReader, PipeWriter};
 }
 
-// todo maybe convert into fd and use a simpler enum
-//  note ( the trait bound `std::process::Stdio: From<BorrowedFd<'_>>` is not satisfied )
+/// An enum attempting to avoid the need for `dyn Write`
 #[derive(Debug)]
-pub enum OutStream {
-    Std,
+pub enum OutStream<T> {
+    Std(T),
     File(File),
     PipeWriter(PipeWriter),
+}
+
+impl<W: Write> Write for OutStream<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Std(t) => t.write(buf),
+            Self::File(f) => f.write(buf),
+            Self::PipeWriter(w) => w.write(buf),
+        }
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Std(t) => t.flush(),
+            Self::File(f) => f.flush(),
+            Self::PipeWriter(w) => w.flush(),
+        }
+    }
 }
 
 impl From<InStream> for Stdio {
@@ -64,10 +84,10 @@ impl From<InStream> for Stdio {
     }
 }
 
-impl From<OutStream> for Stdio {
-    fn from(out_stream: OutStream) -> Self {
+impl<T> From<OutStream<T>> for Stdio {
+    fn from(out_stream: OutStream<T>) -> Self {
         match out_stream {
-            OutStream::Std => Self::inherit(),
+            OutStream::Std(_) => Self::inherit(),
             OutStream::File(f) => f.into(),
             OutStream::PipeWriter(w) => w.inner.into(),
         }
