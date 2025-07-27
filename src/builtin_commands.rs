@@ -45,22 +45,22 @@ impl BuiltinCommand {
         match self {
             Self::Exit => std::process::exit(0),
             Self::Echo => {
-                write!(out_redirect, "{}", args_iter.format(" "))?;
+                writeln!(out_redirect, "{}", args_iter.format(" "))?;
             }
             Self::Type => {
                 for arg in args_iter {
                     if arg.as_ref().parse::<Self>().is_ok() {
-                        write!(out_redirect, "{arg} is a shell builtin")?;
+                        writeln!(out_redirect, "{arg} is a shell builtin")?;
                     } else if let Some(path) = arg.as_ref().first_executable_match_in_path() {
-                        write!(out_redirect, "{arg} is {}", path.display(),)?;
+                        writeln!(out_redirect, "{arg} is {}", path.display(),)?;
                     } else {
-                        write!(out_redirect, "{arg}: not found")?;
+                        writeln!(out_redirect, "{arg}: not found")?;
                     }
                 }
             }
             Self::PrintWorkingDir => {
                 let current_dir = std::env::current_dir()?;
-                write!(out_redirect, "{}", current_dir.to_string_lossy())?;
+                writeln!(out_redirect, "{}", current_dir.to_string_lossy())?;
             }
             Self::ChangeDir => {
                 let mut path: PathBuf = args_iter
@@ -81,7 +81,7 @@ impl BuiltinCommand {
                 let cd_result = std::env::set_current_dir(&path);
 
                 if cd_result.is_err() {
-                    write!(
+                    writeln!(
                         err_redirect,
                         "cd: {}: No such file or directory",
                         &path.to_string_lossy(),
@@ -90,9 +90,6 @@ impl BuiltinCommand {
                 }
             }
         }
-
-        out_redirect.flush()?;
-        err_redirect.flush()?;
         Ok({
             log::info!("builtin command executed with success");
             ExitStatus::default()
