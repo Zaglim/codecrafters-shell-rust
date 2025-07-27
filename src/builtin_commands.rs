@@ -1,18 +1,18 @@
 use crate::executable_path::Executable;
+use crate::stream_target::OutStream;
+use crate::HISTORY;
+use itertools::Itertools;
 use my_derives::MyFromStrParse;
 use std::fmt::Debug;
 use std::io;
 use std::io::{Stderr, Stdout, Write};
-use strum::{EnumIter, IntoStaticStr};
-
-use crate::stream_target::OutStream;
-use crate::HISTORY;
-use itertools::Itertools;
 use std::iter::zip;
+use std::str::FromStr;
 use std::{
     ffi::OsString, fmt::Display, os::unix::process::ExitStatusExt, path::PathBuf,
     process::ExitStatus,
 };
+use strum::{EnumIter, IntoStaticStr};
 
 /// "A command that is implemented internally by the shell itself, rather than by an executable program somewhere in the file system."
 ///
@@ -95,7 +95,17 @@ impl BuiltinCommand {
             }
             Self::History => {
                 HISTORY.with_borrow(|vec| {
-                    for (num, item) in zip(1.., vec) {
+                    let size = if let Some(value) = args_iter.next() {
+                        if let Ok(n) = usize::from_str(value.as_ref()) {
+                            n
+                        } else {
+                            writeln!(err_redirect, "expected a number").unwrap();
+                            todo!("return appropriate exit status");
+                        }
+                    } else {
+                        vec.len()
+                    };
+                    for (num, item) in zip((vec.len() - size + 1)..=size, vec) {
                         writeln!(out_redirect, "{num:>5} {item}").unwrap(); // todo handle write error
                     }
                 });
