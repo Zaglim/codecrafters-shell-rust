@@ -95,17 +95,26 @@ impl BuiltinCommand {
             }
             Self::History => {
                 HISTORY.with_borrow(|vec| {
-                    let size = if let Some(value) = args_iter.next() {
-                        if let Ok(n) = usize::from_str(value.as_ref()) {
-                            n
-                        } else {
-                            writeln!(err_redirect, "expected a number").unwrap();
-                            todo!("return appropriate exit status");
-                        }
-                    } else {
-                        vec.len()
-                    };
-                    for (num, item) in zip((vec.len() - size + 1)..=size, vec) {
+                    let size =
+                        args_iter
+                            .next()
+                            .map_or(vec.len(), |s| match isize::from_str(s.as_ref()) {
+                                Ok(..0) => vec.len(),
+                                #[allow(clippy::cast_sign_loss)]
+                                Ok(u @ 0..) => u as usize,
+                                Err(_) => {
+                                    writeln!(
+                                        err_redirect,
+                                        "history: {}: numeric argument required",
+                                        s.as_ref()
+                                    )
+                                    .unwrap();
+                                    todo!("return appropriate exit status");
+                                }
+                            });
+
+                    let first_number = vec.len().saturating_sub(size) + 1;
+                    for (num, item) in zip(first_number.., vec.iter().tail(size)) {
                         writeln!(out_redirect, "{num:>5} {item}").unwrap(); // todo handle write error
                     }
                 });
