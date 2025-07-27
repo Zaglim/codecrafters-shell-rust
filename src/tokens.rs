@@ -206,7 +206,7 @@ pub enum ReservedWord {
     Then,
     #[strum(serialize = "time")]
     Time,
-    // todo
+    // todo add more reserved words
 }
 
 /// "A control operator or a redirection operator."

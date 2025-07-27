@@ -3,30 +3,27 @@ use std::ops::{Deref, DerefMut};
 use std::process::Stdio;
 
 #[derive(Debug)]
-pub struct WrapPipeReader {
+pub struct PipeReader {
     inner: imp::PipeReader,
 }
 
 #[derive(Debug)]
-pub struct WrapPipeWriter {
+pub struct PipeWriter {
     inner: imp::PipeWriter,
 }
 
-pub fn pipe() -> (WrapPipeReader, WrapPipeWriter) {
+pub fn pipe() -> (PipeReader, PipeWriter) {
     let (reader, writer) = imp::pipe().unwrap();
-    (
-        WrapPipeReader { inner: reader },
-        WrapPipeWriter { inner: writer },
-    )
+    (PipeReader { inner: reader }, PipeWriter { inner: writer })
 }
 
-impl DerefMut for WrapPipeWriter {
+impl DerefMut for PipeWriter {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl Deref for WrapPipeWriter {
+impl Deref for PipeWriter {
     type Target = imp::PipeWriter;
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -37,7 +34,7 @@ impl Deref for WrapPipeWriter {
 pub enum InStream {
     Std,
     File(File),
-    PipeReader(WrapPipeReader),
+    PipeReader(PipeReader),
 }
 
 mod imp {
@@ -54,7 +51,7 @@ mod imp {
 pub enum OutStream {
     Std,
     File(File),
-    PipeWriter(WrapPipeWriter),
+    PipeWriter(PipeWriter),
 }
 
 impl From<InStream> for Stdio {
