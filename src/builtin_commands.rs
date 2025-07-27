@@ -91,6 +91,9 @@ impl BuiltinCommand {
                     return Ok(ExitStatus::from_raw(2));
                 }
             }
+            Self::History => {
+                todo!()
+            }
         }
         Ok({
             log::info!("builtin command executed with success");
