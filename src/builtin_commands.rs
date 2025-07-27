@@ -91,6 +91,8 @@ impl BuiltinCommand {
             }
         }
 
+        out_redirect.flush()?;
+        err_redirect.flush()?;
         Ok({
             log::info!("builtin command executed with success");
             ExitStatus::default()
