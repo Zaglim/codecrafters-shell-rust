@@ -1,8 +1,9 @@
 use crate::executable_path::Executable;
 use crate::stream_target::OutStream;
-use crate::HISTORY;
+use crate::EDITOR;
 use itertools::Itertools;
 use my_derives::MyFromStrParse;
+use rustyline::history::History;
 use std::fmt::Debug;
 use std::io;
 use std::io::{Stderr, Stdout, Write};
@@ -94,30 +95,32 @@ impl BuiltinCommand {
                 }
             }
             Self::History => {
-                HISTORY.with_borrow(|vec| {
-                    let size =
-                        args_iter
-                            .next()
-                            .map_or(vec.len(), |s| match isize::from_str(s.as_ref()) {
-                                Ok(..0) => vec.len(),
-                                #[allow(clippy::cast_sign_loss)]
-                                Ok(u @ 0..) => u as usize,
-                                Err(_) => {
-                                    writeln!(
-                                        err_redirect,
-                                        "history: {}: numeric argument required",
-                                        s.as_ref()
-                                    )
-                                    .unwrap();
-                                    todo!("return appropriate exit status");
-                                }
-                            });
+                log::debug!("exec History");
+                let editor = EDITOR.try_read().unwrap();
+                log::debug!("acheived read lock");
+                let history = editor.history();
+                let size =
+                    args_iter
+                        .next()
+                        .map_or(history.len(), |s| match isize::from_str(s.as_ref()) {
+                            Ok(..0) => history.len(),
+                            #[allow(clippy::cast_sign_loss)]
+                            Ok(u @ 0..) => u as usize,
+                            Err(_) => {
+                                writeln!(
+                                    err_redirect,
+                                    "history: {}: numeric argument required",
+                                    s.as_ref()
+                                )
+                                .unwrap();
+                                todo!("return appropriate exit status");
+                            }
+                        });
 
-                    let first_number = vec.len().saturating_sub(size) + 1;
-                    for (num, item) in zip(first_number.., vec.iter().tail(size)) {
-                        writeln!(out_redirect, "{num:>5} {item}").unwrap(); // todo handle write error
-                    }
-                });
+                let first_number = history.len().saturating_sub(size) + 1;
+                for (num, item) in zip(first_number.., history.iter().tail(size)) {
+                    writeln!(out_redirect, "{num:>5} {item}").unwrap(); // todo handle write error
+                }
             }
         }
         Ok({
