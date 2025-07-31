@@ -40,7 +40,6 @@ fn main() -> AnyResult<()> {
     }
 }
 
-// if this was inline, we would need to call drop(editor) near the end
 fn readline_adding_history() -> AnyResult<String> {
     let mut editor = EDITOR.write().unwrap();
     let raw_line = match editor.readline("$ ") {
@@ -49,6 +48,7 @@ fn readline_adding_history() -> AnyResult<String> {
         Err(err) => return Err(err.into()),
     };
     editor.add_history_entry(&raw_line)?;
+    drop(editor);
     Ok(raw_line)
 }
 

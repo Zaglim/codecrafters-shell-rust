@@ -306,16 +306,23 @@ impl<'a, T: AsRef<str>> From<&'a T> for CommandStream<'a> {
 
 impl Command for SimpleCommand {
     fn spawn(self) -> io::Result<ChildHandle> {
-        match self.location {
+        let Self {
+            location,
+            args,
+            stdin,
+            stdout,
+            stderr,
+        } = self;
+        match location {
             CommandLocation::Builtin(bltn_command) => Ok(ChildHandle::Completed(
-                bltn_command.run_with(self.args, self.stdout, self.stderr)?,
+                bltn_command.run_with(&args, stdout, stderr)?,
             )),
             CommandLocation::External(external) => {
                 let mut command = std::process::Command::new(&*external);
-                command.args(self.args);
-                command.stdin(self.stdin);
-                command.stdout(self.stdout);
-                command.stderr(self.stderr);
+                command.args(args);
+                command.stdin(stdin);
+                command.stdout(stdout);
+                command.stderr(stderr);
                 match command.spawn() {
                     Ok(child) => Ok(ChildHandle::External(child)),
                     Err(e) if e.kind() == ErrorKind::NotFound => {
