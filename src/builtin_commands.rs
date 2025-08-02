@@ -1,16 +1,17 @@
-use crate::executable_path::Executable;
-use crate::stream_target::OutStream;
-use crate::tokens::Token;
-use crate::EDITOR;
+use crate::{executable_path::Executable, stream_target::OutStream, tokens::Token, EDITOR};
 use itertools::Itertools;
 use my_derives::MyFromStrParse;
-use rustyline::error::ReadlineError;
-use rustyline::history::History;
-use std::fmt::Debug;
-use std::io;
-use std::io::{Stderr, Stdout, Write};
-use std::iter::zip;
-use std::{ffi::OsString, os::unix::process::ExitStatusExt, path::PathBuf, process::ExitStatus};
+use rustyline::{error::ReadlineError, history::History};
+use std::fs::File;
+use std::{
+    ffi::OsString,
+    fmt::Debug,
+    io::{self, Stderr, Stdout, Write},
+    iter::zip,
+    os::unix::process::ExitStatusExt,
+    path::PathBuf,
+    process::ExitStatus,
+};
 use strum::{EnumIter, IntoStaticStr};
 
 /// "A command that is implemented internally by the shell itself, rather than by an executable program somewhere in the file system."
@@ -36,32 +37,32 @@ impl BuiltinCommand {
     pub(crate) fn run_with(
         &self,
         args: &[Token],
-        mut out_redirect: OutStream<Stdout>,
-        mut err_redirect: OutStream<Stderr>,
+        mut out_writer: OutStream<Stdout>,
+        mut err_writer: OutStream<Stderr>,
     ) -> io::Result<ExitStatus> {
         let mut args_iter = args.iter().map(AsRef::<str>::as_ref).peekable();
 
         match self {
             Self::Exit => std::process::exit(0),
             Self::Echo => {
-                writeln!(out_redirect, "{}", args_iter.format(" "))?;
+                writeln!(out_writer, "{}", args_iter.format(" "))?;
                 Ok(ExitStatus::default())
             }
             Self::Type => {
                 for arg in args_iter {
                     if arg.parse::<Self>().is_ok() {
-                        writeln!(out_redirect, "{arg} is a shell builtin")?;
+                        writeln!(out_writer, "{arg} is a shell builtin")?;
                     } else if let Some(path) = arg.first_executable_match_in_path() {
-                        writeln!(out_redirect, "{arg} is {}", path.display())?;
+                        writeln!(out_writer, "{arg} is {}", path.display())?;
                     } else {
-                        writeln!(out_redirect, "{arg}: not found")?;
+                        writeln!(out_writer, "{arg}: not found")?;
                     }
                 }
                 Ok(ExitStatus::default())
             }
             Self::PrintWorkingDir => {
                 let current_dir = std::env::current_dir()?;
-                writeln!(out_redirect, "{}", current_dir.to_string_lossy())?;
+                writeln!(out_writer, "{}", current_dir.to_string_lossy())?;
                 Ok(ExitStatus::default())
             }
             Self::ChangeDir => {
@@ -82,7 +83,7 @@ impl BuiltinCommand {
 
                 if cd_result.is_err() {
                     writeln!(
-                        err_redirect,
+                        err_writer,
                         "cd: {}: No such file or directory",
                         &path.to_string_lossy(),
                     )?;
@@ -95,11 +96,32 @@ impl BuiltinCommand {
                 log::debug!("exec History");
 
                 match args_iter.next() {
+                    Some("-w") => {
+                        // write history to a file
+                        let file_str: Box<str> = if let Some(arg) = args_iter.next() {
+                            arg.into()
+                        } else if let Ok(histfile) = std::env::var("HISTFILE") {
+                            histfile.into_boxed_str()
+                        } else {
+                            Box::from("~/.bash_history")
+                        };
+                        let editor = EDITOR.read().unwrap();
+
+                        let history = editor.history();
+                        let mut file = File::create(&*file_str)?;
+
+                        for entry in history {
+                            writeln!(file, "{entry}")?;
+                        }
+                        drop(editor);
+
+                        Ok(ExitStatus::default())
+                    }
                     Some("-r") => {
                         // append history with all the given files
 
                         if args_iter.peek().is_none() {
-                            writeln!(err_redirect, "expected argument").unwrap();
+                            writeln!(err_writer, "expected argument").unwrap();
                             todo!("return appropriate exit status");
                         }
                         let mut editor = EDITOR.write().unwrap();
@@ -121,14 +143,14 @@ impl BuiltinCommand {
                         // invalid input
 
                         writeln!(
-                            err_redirect,
+                            err_writer,
                             "history: {not_a_number}: numeric argument required",
                         )
                         .unwrap();
                         todo!("return appropriate exit status");
                     }
                     opt_number_string @ (None | Some(_)) => {
-                        // print some tail of the history
+                        // print segment of history
 
                         let e = EDITOR.read().unwrap();
                         let history = e.history();
@@ -138,7 +160,7 @@ impl BuiltinCommand {
 
                         let first_number = history.len().saturating_sub(size) + 1;
                         for (num, item) in zip(first_number.., history.iter().tail(size)) {
-                            writeln!(out_redirect, "{num:>5} {item}").unwrap(); // todo handle write error
+                            writeln!(out_writer, "{num:>5} {item}").unwrap(); // todo handle write error
                         }
                         drop(e);
                         Ok(ExitStatus::default())

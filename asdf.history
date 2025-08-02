@@ -1,0 +1,1000 @@
+zed ~/Projects/leetcode
+rm -rf /home/zaglim/.local/share/zed/languages/rust-analyzer/rust-analyzer-2025-06-09
+rm -rf /home/zaglim/.local/share/zed/languages/rust-analyzer/*
+cargo test robot_test_thing -- --nocapture
+clear
+cargo test robot_test_thing -- --nocapture
+clear
+cargo test robot_test_thing -- --nocapture
+clear
+cargo test robot_test_thing -- --nocapture
+clear
+cargo test robot_test_thing -- --nocapture
+cargo leet test
+cargo leet submit
+cargo leet test
+cargo leet bench
+cargo bench
+cargo bench --help
+cargo leet test
+cargo test robot_test_thing --nocapture
+cargo test robot_test_thing -- --nocapture
+clear
+cargo test robot_test_thing -- --nocapture
+bacon
+cd
+clear
+lsusb
+xrandr --listmonitors
+xrandr
+dmesg | tail -50 | grep -i -E "(usb|hdmi|display)"
+sudo dmesg | tail -50 | grep -i -E "(usb|hdmi|display)"
+lsusb
+find /sys/class/drm -name "card*" -type d
+ls /sys/class/drm/
+for port in /sys/class/drm/card1-DP-*; do echo "=== $(basename $port) ==="; cat $port/status 2>/dev/null || echo "Cannot read status"; done
+lsmod | grep -i displaylink
+sudo dnf install displaylink
+sudo dnf search displaylink
+mkdir cpp_impl
+cp ../src/findUnpaired.cpp findUnpaired.cpp
+cd ..
+mkdir python
+sudo dnf --refresh upgrade && flatpak update
+clear
+cd ../../NAB_codility/
+mkdir q2
+rm q2
+rm -rf q2
+cargo new --lib q2
+bacon
+bacon
+ls /home/zaglim/.local/share/zed/languages/rust-analyzer/rust-analyzer*
+rm 
+rm -rf /home/zaglim/.local/share/zed/languages/rust-analyzer
+cd ..
+git clone https://git.codecrafters.io/cc1ad562dfb90cd1 codecrafters-http-server-rust
+cd codecrafters-http-server-rust
+cargo add serde
+cargo rm serde
+git commit --allow-empty -m 'test'
+git push origin master
+git commit -am "uncommented initial code"
+git push origin master
+codecrafters test
+cargo add log
+codecrafters test
+codecrafters submit
+cargo add itertools
+bacon
+cargo rm anyhow
+bacon
+codecrafters test
+./your_program.sh 
+codecrafters test
+cargo add env_logger
+./your_program.sh 
+codecrafters test
+codecrafters submit
+bacon
+codecrafter test -reverser
+codecrafter test --help
+codecrafters test --help
+codecrafters test -previous
+clear
+cd ~
+ls
+mkdir Projects/amazon_hackerrank
+cd Projects/
+rm -rf amazon_hackerrank
+cargo new --lib amazon_hackerrank
+cargo add itertools
+cargo rm itertools
+cargo add itertools
+bacon
+cargo rm itertools
+bacon
+cargo add rstest
+bacon
+cargo test
+cargo add log
+cargo add env_logger
+cargo test
+git branch --help
+tldr git branch
+git branch reversing_iterator_soln
+cargo test
+bacon
+bacon --help
+bacon pedantic
+cargo test
+bacon --help
+bacon
+cargo test
+cargo leet test
+cargo leet --help
+cargo leet activ
+cargo leet active
+cargo leet active add_binary
+cargo leet test
+cargo check
+bacon
+cargo test
+bacon
+bacon
+cargo fix
+cargo test
+cargo test using_a_robot
+cargo test add_two
+bacon
+cargo clippy fix
+cargo fix clippy
+cargo fix --help
+bacon
+cargo test
+bacon
+cargo test
+cargo test find_even
+cargo test finding_even
+cargo test finding
+cargo test plus_one
+cargo test two_sum
+cargo test
+cargo test longest_unequal
+cd Projects/leetcode
+git status
+gh repo --help
+gh repo create --help
+gh repo create
+gh --help
+cd ..
+rm -rf leet
+cd Projects/leetcode
+gh repo create
+git diff
+git commit -m "fix: two_sum"
+git add .
+git commit -m "fix: two_sum"
+git push
+gh repo --help
+gh repo rename --help
+gh repo rename
+clear
+echo asdf
+clear
+cd
+clear
+cd Projects/
+sudo dnf --refresh upgrade && flatpak update
+clear
+sudo dnf --refresh upgrade && flatpak update
+sudo dnf up zed
+sudo dnf up --refresh zed
+cargo leet active
+cargo leet test
+cargo test
+cargo leet active longest_unequal_adjacent_groups_subsequence_ii
+cargo leet test
+bacon
+cargo leet longest-unequal-adjacent-groups-subsequence-i
+cargo leet --generate longest-unequal-adjacent-groups-subsequence-i
+cargo leet --help
+cargo leet -g longest-unequal-adjacent-groups-subsequence-i
+whatis sum
+evcxr
+dict -h dict.org -d wn aptitude
+evcxr
+clear
+evcxr
+cargo new nab_test
+zed nab_test
+sudo dnf up zed
+sudo dnf --refresh upgrade && flatpak update
+whatis Extest
+which extest
+whereis extest Extest EXTEST
+file /usr/libexec/extest
+ls -la /usr/libexec/extest
+rpm -qf /usr/libexec/extest
+rpm -qi extest-steam
+rpm -qi extest
+dnf info extest
+whatis update-alternatives
+sudo dnf --refresh upgrade && flatpak update
+dnf info zed
+clear
+chezmoi
+tldr chezmoi
+chezmoi -v apply
+chezmoi diff
+zed .bashrc
+chezmoi diff
+chezmoi add
+chezmoi add .bashrc
+tldr chezmoi
+tldr -u
+chezmoi
+chezmoi status
+chezmoi add .bashrc
+man chezmoi
+chezmoi add .cargo
+chezmoi
+chezmoi diff
+chezmoi status
+chezmoi apply --help
+chezmoi apply
+chezmoi apply ~/.bashrc
+chezmoi status
+chezmoi diff
+chezmoi git
+chezmoi git diff
+chezmoi git commit -m "update dot_bashrc"
+chezmoi git commit -- -m "update dot_bashrc"
+ls
+exit
+chezmoi cd
+chezmoi
+chezmoi git -- diff
+chezmoi git -- commit -m "update dot_bashrc"
+chezmoi git -- diff
+ls
+git diff
+ls
+chezmoi add dot_bashrc
+exit
+chezmoi cd
+whatis nc
+tldr nc
+baocn
+bacon
+codecrafters -previous test
+codecrafters test -previous
+codecrafters test
+codecrafters submit
+codecrafters test
+codecrafters submit
+bacon
+bat .git/info/exclude
+echo ".idea/" >> .git/info/exclude
+clear
+codecrafters test
+codecrafters test -previous
+codecrafters test
+bacon
+codecrafters test
+codecrafters submit
+cd Projects/leetcode
+bacon
+cargo leet active
+cargo leet test
+cargo leet active longest_unequal_adjacent_groups_subsequence_ii
+cargo leet test
+uname -r
+whatis uname
+uname
+uname --help
+uname -s
+uname -a
+uname -p
+uname -i
+uname -o
+sudo dnf --refresh upgrade && flatpak update
+cat /sys/kernel/debug/sched/preempt
+sudo cat /sys/kernel/debug/sched/preempt
+cargo leet test
+sudo dnf --refresh upgrade && flatpak update
+cargo add clap
+cargo check
+cargo rm clap
+cargo add clap --derive
+cargo add clap
+cargo check
+cargo update
+cargo check
+./your_program.sh
+codecrafters test
+cargo check
+cargo clippy
+bacon
+bacon
+clear
+codecrafters submit
+clear
+bacon
+clear
+cd 'AppImages'
+cd '..'
+clear
+ddcutil-service
+echo $XDG_CURRENT_DESKTOP
+gsettings list-recursively org.gnome.settings-daemon.plugins.media-keys | grep -i backlight
+gsettings list-recursively org.gnome.settings-daemon.plugins.media-keys | grep -E "(kbd|keyboard)"
+gsettings list-recursively org.gnome.desktop.wm.keybindings | grep -i "ctrl.*space\|space.*ctrl"
+gsettings list-recursively org.gnome.settings-daemon.plugins.media-keys.custom-keybindings
+gsettings list-recursively | grep -i "ctrl.*space\|control.*space"
+gsettings set org.freedesktop.ibus.general.hotkey trigger "['Zenkaku_Hankaku', 'Alt+Kanji', 'Alt+grave', 'Hangul', 'Alt+Release+Alt_R']"
+gsettings get org.freedesktop.ibus.general.hotkey trigger
+echo $XDG_CURRENT_DESKTOP
+gsettings list-recursively | grep -i "keyboard\|brightness\|space" | grep -v "org.gnome.desktop.wm"
+gsettings get org.gnome.settings-daemon.plugins.media-keys keyboard-brightness-toggle
+gsettings list-recursively org.gnome.settings-daemon.plugins.media-keys.custom-keybinding
+gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings
+gsettings list-recursively org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/
+for i in {0..3}; do echo "=== Custom keybinding $i ==="; gsettings list-recursively org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom$i/; done
+lsusb | grep -i keyboard
+dmesg | grep -i keyboard | tail -10
+ls /sys/class/leds/ | grep -i kbd
+cat /sys/class/leds/chromeos::kbd_backlight/brightness
+cat /sys/class/leds/chromeos::kbd_backlight/max_brightness
+lsmod | grep -i chrome
+lsmod | grep -i cros
+modinfo cros_kbd_led_backlight
+which setkeycodes
+which evtest
+xmodmap -pke | grep -i space
+gsettings get org.gnome.settings-daemon.plugins.media-keys keyboard-brightness-toggle
+ls -la /sys/class/leds/chromeos::kbd_backlight/
+sudo dnf --refresh upgrade && flatpak update
+dnf info zed
+sudo dnf --refresh upgrade && flatpak update
+sudo dnf up zed
+uname -m
+dnf search zed --showduplicates
+curl -s https://raw.githubusercontent.com/terrapkg/packages/f42/anda/devs/zed/stable/zed.spec
+cargo add thiserror
+bacon
+cargo add enum_dispatch
+bacon
+dict -h dict.org -d wn iota
+sudo dnf --refresh upgrade && flatpak update
+whatis google-chrome-canary
+dnf remove google-chrome-canary
+sudo dnf remove google-chrome-canary
+flatpak update
+codecrafters test -previous
+bacon
+clear
+cargo add flat2
+cargo add flate2
+codecrafters test
+bacon
+dnf info zed
+sudo dnf --refresh upgrade && flatpak update
+whatis baobab
+gnome-shell --version
+gnome-extensions list --enabled
+gnome-extensions prefs top-bar-organizer@julian.gse.jsts.xyz
+gsettings get org.gnome.shell.extensions.top-bar-organizer left-box-order
+gsettings list-schemas | grep -i "top\\|bar\\|panel"
+gsettings get org.gnome.shell.extensions.dash-to-panel panel-element-positions
+gsettings list-schemas | grep -i panel
+gsettings list-schemas | grep -i gnome
+gsettings list-keys org.gnome.shell
+gsettings list-keys org.gnome.shell.extensions.window-list
+gsettings get org.gnome.shell.extensions.dash-to-panel panel-element-positions
+gsettings get org.gnome.shell enabled-extensions
+gsettings list-schemas | grep -E "(panel|bar|top)"
+gsettings get panel-element-positions
+gsettings panel-element-positions
+clear
+dioxus-cli --version
+cargo install dioxus-cli
+cd ..
+dx --version
+rm -rf Dioxus-TUTORIAL
+clear
+cd Projects
+dx new dioxus_tutorial_hot_dog
+cd dioxus_tutorial_hot_dog
+dx serve
+bacon
+git init
+bacon
+sudo dnf --refresh upgrade && flatpak update
+codecrafters test -previous
+bacon
+BACON
+bacon
+clear
+codecrafters test
+codecrafters submitbacon
+bacon
+codecrafters submit
+python
+npm run dev
+bun run dev
+yarn dev
+yarn --uninstal
+yarn --help
+bun dev
+bun dev --help
+next dev
+pnpm dev --help
+pnpm dev
+bun run dev-no-turbo
+bun rm tailwind
+bun rm tailwindcss
+bun check
+bun lint
+bun dev
+bun dev-nt
+bun lint
+bun dev-no-turbo
+git pull
+git info
+git list
+git status
+   git log --oneline -n 10
+   
+git config pull.rebase true
+git pull
+git config pull.rebase false
+git pull
+git rebase --continue
+bacon
+codecrafters test
+codecrafters submit
+bacon
+codecrafters submit
+bacon
+codecrafters submit
+bacon
+codecrafters submit
+dx serve
+clear
+ls -la
+nautilus --version
+gsettings get org.gnome.nautilus.preferences show-directory-item-counts
+systemctl --user status tracker-miner-fs-3.service
+systemctl --user list-units | grep tracker
+which tracker3
+df -h /home
+whatis rg
+whatis ripgrep
+rg --help
+whatis rg
+systemctl --user status tracker-miner-fs-3
+dnf info zed
+sudo dnf --refresh upgrade && flatpak update
+/bin/sh /home/zaglim/Projects/CodeCrafters/codecrafters-shell-rust/your_program.sh
+bacon
+cargo expand --help
+bacon
+cargo info strum
+bacon
+codecrafter test
+codecrafters test
+codecrafters test -previous
+./your_program.sh 
+./your_program.sh dbg
+cargo build --help
+cargo build --profile --help
+./your_program.sh dbg
+./your_program.sh 
+codecrafters test -previous
+echo $PATH
+codecrafters test -previous
+bacon
+codecrafters test -previous
+bacon
+whatis rev
+rev asdf
+tldr rev
+tldr case
+tldr rev
+echo "hello" | rev
+cargo doc --open
+bacon
+cargo add itertools
+bacon
+codecrafters test -previous
+./your_program.sh
+bacon
+./your_program.sh
+./your_program.sh dbg
+bacon
+./your_program.sh dbg
+bacon
+./your_program.sh dbg
+echo if you need cake then && asdf
+./your_program.sh dbg
+;
+echo asdf;
+echo asdf;;
+echo asdf; ;
+./your_program.sh dbg
+asdf asdfkoj asdf8i 
+./your_program.sh dbg
+bacon
+./your_program.sh dbg
+codecrafters test -previous
+bacon
+codecrafters test -previous
+bacon
+codecrafters test -previous
+bacon
+codecrafters test -previous
+sudo dnf --refresh upgrade && flatpak update
+bacon
+codecrafters test -previous
+asdfasdf
+./your_program.sh dbg
+codecrafters test -previous
+./your_program.sh dbg
+bacon
+echo asdf             asdf
+./your_program.sh dbg
+echo asdf            asdf
+bacon
+cd
+bacon
+codecrafters test -previous
+bacon
+codecrafters test -previous
+./your_program.sh dbg
+codecrafters test -previous
+bacon
+codecrafters test -previous
+./your_program.sh dbg
+bacon
+./your_program.sh dbg
+codecrafters test -previous
+echo --help
+echo -- --help
+tldr echo
+cat /tmp/asdf
+echo contents > /tmp/c/asdf
+echo contents > /tmp/asdf
+cat /tmp/asdf
+type cat
+type cargo
+type echo
+type type
+la
+ls
+cat a
+ls
+./your_program.sh dbg
+echo hello > /tmp/farts
+cat /tmp/farts
+./your_program.sh dbg
+cat /tmp/hello
+cat /tmp/farts
+echo "this is tmp hello" > /tmp/hello
+cat /tmp/hello
+rm /tmp/hello
+cat /tmp/hello
+./your_program.sh dbg
+codecrafters test
+codecrafters test -previous
+./your_program.sh 
+./your_program.sh dbg
+bacon
+echo asdf -- cat /tmp/a
+echo asdf; cat /tmp/a
+cargo add google-docs1
+cargo add smol
+cargo add table_extract
+cargo run
+cargo add scraper
+cargo run
+bacon
+cargo run
+bacon
+cargo run
+bacon
+cargo run
+RUST_BACKTRACE=1 cargo run
+sudo dnf --refresh upgrade && flatpak update
+bacon
+sudo dnf --refresh upgrade && flatpak update
+tldr ddcutil
+ddcutil --display 1 setvcp 10 100
+clear
+cat /tmp/quz/file-32
+rm /tmp/quz/file-32
+cat /tmp/quz/file-32
+echo -n "blueberry pear\napple orange\ngrape pineapple\nbanana raspberry\nmango strawberry" > "/tmp/foo/file-34"
+mkdir -p /tmp/foo
+echo -n "blueberry pear\napple orange\ngrape pineapple\nbanana raspberry\nmango strawberry" > "/tmp/foo/file-34"
+ cat /tmp/foo/file-34 | wc
+cat /tmp/foo/file-34
+tldr wc
+wc -l /tmp/foo/file-34
+cat /tmp/foo/file-34
+cat /tmp/quz/file-32
+echo -n "1. mango blueberry\n2. pineapple pear\n3. banana grape" > "/tmp/quz/file-32"
+cat /tmp/foo/file-34
+cat /tmp/quz/file-32
+clear
+cat /tmp/quz/file-32
+tldr wc
+cat /tmp/quz/file-32
+clear
+cat /tmp/quz/file-32
+tail -f /tmp/quz/file-32 | head -n 5
+tail -f /tmp/quz/file-32
+tail --help
+tail /tmp/quz/file-32
+tail /tmp/quz/file-32 | head -n 5
+ echo -n "1. mango blueberry\n2. pineapple pear\n3. banana grape" > "/tmp/quz/file-32"
+cat /tmp/quz/file-32
+echo -e -n "1. mango blueberry\n2. pineapple pear\n3. banana grape" > "/tmp/quz/file-32"
+cat /tmp/quz/file-32
+tail /tmp/quz/file-32 | head -n 5
+echo -n "1. mango blueberry\n2. pineapple pear\n3. banana grape" > "/tmp/quz/file-32"
+tail /tmp/quz/file-32 | head -n 5
+echo "This is line 4." >> /tmp/quz/file-32
+tail -f /tmp/quz/file-32 | head -n 5
+cd Projects/CodeCrafters/codecrafters-shell-rust/
+codecrafters test -previous
+echo --help
+echo -- --help
+tldr echo
+echo --help
+help echo
+clear
+help echo && codecrafters test
+codecrafters test
+help echo && codecrafters test
+help echo
+man echo
+clear
+./your_program.sh 
+clear
+cd /tmp/testing
+mkdir /tmp/testing
+cd /tmp/testing
+ls
+echo -n "1. mango blueberry\n2. pineapple pear\n3. banana grape" > "/tmp/quz/file-32"
+cd ..
+mkdir quz
+cd quz
+ echo -n "1. mango blueberry\n2. pineapple pear\n3. banana grape" > "/tmp/quz/file-32"
+ls
+wc file-32 
+cat /tmp/foo/file-34 | wc
+tail -f /tmp/quz/file-32 | head -n 5
+head --help
+tail -f /tmp/quz/file-32 | head -n 5
+tail -f /tmp/quz/file-32
+cat /tmp/quz/file-32 
+clear
+ echo -n "1. mango blueberry\n2. pineapple pear\n3. banana grape" > "/tmp/quz/file-32"
+cat /tmp/quz/file-32
+echo --help
+echo -- --help
+tldr echo
+ echo -n "1. mango blueberry\n2. pineapple pear\n3. banana grape" > "/tmp/quz/file-32"
+ echo -e -n "1. mango blueberry\n2. pineapple pear\n3. banana grape" > "/tmp/quz/file-32"
+cat /tmp/quz/file-32 
+./your_program.sh 
+./your_program.sh dbg
+ls
+./your_program.sh dbg
+echo c | cat
+cat c
+echo c | grep
+grep c | echo
+grep c
+whatis grep
+ls
+ls c | grep
+ls c | grep c
+ls | grep c
+./your_program.sh dbf
+./your_program.sh dbg
+ls > contents_of_ls
+cat contents_of_ls 
+rm contents_of_ls 
+ls
+cat contents_of_ls
+./your_program.sh dbg
+cat contents_of_ls 
+ls > contents_of_ls
+cat contents_of_ls 
+ls > contents_of_ls
+cat contents_of_ls 
+./your_program.sh dbg
+ls
+./your_program.sh dbg
+ls > asdf | echo
+ls > asdf | echo hello
+ls > asdf | echo
+ls > asdf | echo | echo hello | echo
+./your_program.sh dbg
+ls | grep b
+ls
+cat grep
+rm grep
+ls
+cat asdf
+rm asdf
+ls
+cat a b
+cat a
+cat b
+rm a b
+ls
+cat c
+./your_program.sh
+./your_program.sh dbg
+ls | grep b
+./your_program.sh dbg
+codecrafters test
+cargo check
+cargo clean
+cargo check
+bacon
+codecrafters test
+bacon
+cargo check --help
+bacon
+cargo info os_pipe
+cargo info os_pipes
+cargo add os_pipe
+bacon
+codecrafters test
+whatis wc
+wc
+wc a b d c
+ld
+ls | grep a
+ls | grep c
+ls
+clear
+./your_program.sh dbg
+cat a
+./your_program.sh dbg
+ls | echo
+a < echo
+echo < a
+cat a
+cat a | echo
+"hello" | echo
+a < cat
+cat < a
+echo < a
+echo < asdf
+bacon
+cargo add rustversion
+bacon
+sudo dnf --refresh upgrade && flatpak update
+which glibc 
+clear
+curl -f https://zed.dev/install.sh | sh
+dnf remove zed
+sudo dnf remove zed
+(alias; declare -f) | /usr/bin/which --tty-only --read-alias --read-functions --show-tilde --show-dot zed
+zed --version
+cd Projects/dioxus_tutorial_hot_dog/
+dx serve
+bun i @tiptap-pro/extension-export
+npm i @tiptap-pro/extension-export
+bunx @tiptap/cli@latest add simple-editor
+bun dev
+sudo dnf --refresh upgrade && flatpak update
+clear
+ls
+echo "hello"
+cd Projects/dioxus_tutorial_hot_dog/
+cd '..'
+cd dioxus_tutorial_hot_dog
+bun dev
+   cp .env.example .env.local
+cd ../CodeCrafters/codecrafters-shell-rust/
+codecrafters test
+zed /home/zaglim/.config/bacon/prefs.toml
+bacon
+./your_program.sh
+bacon
+bacon --help
+bacon --help-line
+bacon
+bacon --no-help-line
+bacon
+bacon --list
+bacon --list-jobs
+bacon --config
+bacon --config-toml
+bacon --help
+help bacon
+bacon --prefs
+bacon
+codecrafters submit
+cd ..
+cd codecrafters-shell-rust/
+bun dev
+clear
+bun dev
+clear
+bun dev
+clear
+bun dev
+clear
+bun dev
+clear
+bun dev
+clear; bun dev
+cd ../../JORG-rich-content-management-system/
+clear
+ls -la
+gh --version
+gh auth status
+gh repo create JORG-rich-content-management-system --private --source=. --remote=origin --push
+git status
+bun build
+bun lint
+clear
+next build
+bun build
+bun run build
+bun next clean
+bun next build
+cd Projects/joy-work-website/
+git status
+git branch
+git checkout preview
+git checkout -b preview
+bun i neondatabase
+bun i neon
+bun i dompurify
+bun i
+bun run dev
+bun lint
+bun run dev
+bun i
+bun run dev
+bun clean
+bun run clean
+bun uninstall
+bun i --clean
+bun run dev
+sudo dnf --refresh upgrade && flatpak update
+sudo dnf upgrade
+bacon
+whatis ws
+tldr ws
+tldr wc
+man wc
+echo hey hoo
+history
+sudo dnf --refresh upgrade && flatpak update
+codecrafters submit
+bacon
+codecrafters submit
+history
+codecrafters submit
+bacon
+codecrafters submit
+clear
+history
+./your_program.sh 
+history
+bacon
+echo "fart"; echo "cake"
+history
+bacon
+codecrafters test
+history
+./your_program.sh dbg
+bacon
+codecrafters test
+bacon
+codecrafters submit
+baocn
+bacon
+codecrafters submit
+codecrafters test
+./your_program.sh 
+history j
+history 99999
+./your_program.sh 
+bacon
+codecrafters test
+bacon
+codecrafters test
+codecrafters submit
+histoyr
+history
+bacon
+./your_program.sh 
+codecrafters test
+bacon
+cd Projects
+cargo new const_tests
+bacon
+sudo dnf --refresh upgrade && flatpak update
+julia --version
+dnf info julia
+cargo test
+bacon
+codecrafters test
+./your_program.sh
+./your_program.sh dbg
+baconn
+bacon
+./your_program.sh dbg
+bacon
+codecrafters test
+codecrafters submit
+bacon
+./your_program.sh
+cargo add clap
+bacon
+nproc
+lscpu
+./your_program.sh
+cargo add clap
+bacon
+nproc
+lscpu
+history
+history --help
+history
+history 10000
+clear
+history -h
+history --help
+echo $HISTFILE
+clear
+hM
+clear
+codecrafters test
+ping
+./your_program.sh dbg
+history asdf asdf asdf
+history -r asdxf asdf
+history 1 sd
+history --help
+cat a
+cat b
+ls
+cat c
+history -r src
+history
+bacon
+history a
+bacon
+history -r hello -a
+stat --help
+exiv2 --help
+bacon
+codecrafters submit
+./your_program.sh dgb
+./your_program.sh dbg
+ls \
+bacon
+codecrafters submit
+history --help
+ddcutil --display 1 setvcp 10 100
+id
+ls
+which chrome
+which google-chrome
+bun dev
+bun add sanitize-html
+bun add -d @types/sanitize-html
+bun remove dompurify
+bun dev
+clear
+bun dev
+bun lint
+bun dev
+NODE_OPTIONS='--inspect' next dev
+clear
+whatis audit
+(alias; declare -f) | /usr/bin/which --tty-only --read-alias --read-functions --show-tilde --show-dot audit
+(alias; declare -f) | /usr/bin/which --tty-only --read-alias --read-functions --show-tilde --show-dot asdfasdlfkj
+which aslkdjflkj
+sudo dnf --refresh upgrade && flatpak update
+history --help
+ls
+history
+history -w asdf.history
+ls
+cat asdf.history
+history -w asdf.history
+cat asdf.history
+clear
+history -w asdf.history second_file.history
