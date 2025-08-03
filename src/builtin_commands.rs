@@ -2,17 +2,14 @@ use crate::{executable_path::Executable, stream_target::OutStream, tokens::Token
 use itertools::Itertools;
 use my_derives::MyFromStrParse;
 use rustyline::{error::ReadlineError, history::History};
-use std::ffi::OsStr;
-use std::fs::File;
-use std::io::{read_to_string, BufRead, BufReader, Read, Seek, SeekFrom};
-use std::path::Path;
 use std::{
-    ffi::OsString,
+    ffi::{OsStr, OsString},
     fmt::Debug,
-    io::{self, Stderr, Stdout, Write},
+    fs::File,
+    io::{self, read_to_string, BufRead, BufReader, Read, Seek, SeekFrom, Stderr, Stdout, Write},
     iter::zip,
     os::unix::process::ExitStatusExt,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::ExitStatus,
 };
 use strum::{EnumIter, IntoStaticStr};
@@ -48,15 +45,19 @@ impl BuiltinCommand {
         match self {
             Self::Exit => {
                 // write history then leave
-                let path = history_default_path();
-                log::info!("saving to {}", path.to_string_lossy());
-                BuiltinCommand::History.run_with(
+                let error_code = match Self::History.run_with(
                     &[Token::from("-w".to_string())],
                     out_writer,
                     err_writer,
-                )?;
+                ) {
+                    Ok(status) => status,
+                    Err(error) => {
+                        log::error!("Error saving history on exit: {error}");
+                        todo!("use appropriate error code")
+                    }
+                };
 
-                std::process::exit(0)
+                std::process::exit(error_code.into_raw())
             }
             Self::Echo => {
                 writeln!(out_writer, "{}", args_iter.format(" "))?;
