@@ -2,6 +2,7 @@ use crate::{executable_path::Executable, stream_target::OutStream, tokens::Token
 use itertools::Itertools;
 use my_derives::MyFromStrParse;
 use rustyline::{error::ReadlineError, history::History};
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{read_to_string, BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
@@ -190,13 +191,21 @@ impl BuiltinCommand {
 
 pub fn history_default_path() -> Box<Path> {
     const HISTFILE_KEY: &str = "HISTFILE";
-    const BACKUP: &str = "~/.bash_history";
 
-    std::env::var(HISTFILE_KEY).map_or_else(
-        |_| {
-            log::trace!("{HISTFILE_KEY} not declared in current env. Using backup: `{BACKUP}`");
-            Path::new(BACKUP).into()
-        },
-        |h| PathBuf::from(h).into(),
-    )
+    std::env::var(HISTFILE_KEY)
+        .map_or_else(
+            |_| {
+                let backup_path = PathBuf::from_iter::<[&OsStr; 2]>([
+                    std::env::var_os("HOME").unwrap().as_ref(),
+                    ".bash_history".as_ref(),
+                ]);
+                log::trace!(
+                    "{HISTFILE_KEY} not declared in current env. Using backup: `{}`",
+                    backup_path.display()
+                );
+                backup_path
+            },
+            |h| PathBuf::from(h),
+        )
+        .into_boxed_path()
 }

@@ -11,7 +11,7 @@ use anyhow::Result as AnyResult;
 use builtin_commands::BuiltinCommand;
 use completion::MyCompleter;
 use rustyline::{
-    config::Configurer, error::ReadlineError, history::FileHistory, CompletionType, Config, Editor,
+    config::Configurer, error::ReadlineError, history::FileHistory, CompletionType, Editor,
 };
 use std::sync::{LazyLock, RwLock};
 
