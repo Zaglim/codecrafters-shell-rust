@@ -46,7 +46,18 @@ impl BuiltinCommand {
         let mut args_iter = args.iter().map(AsRef::<str>::as_ref).peekable();
 
         match self {
-            Self::Exit => std::process::exit(0),
+            Self::Exit => {
+                // write history then leave
+                let path = history_default_path();
+                log::info!("saving to {}", path.to_string_lossy());
+                BuiltinCommand::History.run_with(
+                    &[Token::from("-w".to_string())],
+                    out_writer,
+                    err_writer,
+                )?;
+
+                std::process::exit(0)
+            }
             Self::Echo => {
                 writeln!(out_writer, "{}", args_iter.format(" "))?;
                 Ok(ExitStatus::default())
