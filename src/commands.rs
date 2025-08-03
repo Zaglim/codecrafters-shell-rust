@@ -160,7 +160,6 @@ fn try_build_operator(iter: &Peekable<Chars>) -> Result<String, ()> {
 
 impl Command for Pipeline {
     fn run_blocking(self) -> io::Result<ExitStatus> {
-        log::info!("running {self:?}");
         let mut exit_status = ExitStatus::default();
 
         // spawn all
@@ -206,7 +205,6 @@ impl Iterator for CommandStream<'_> {
 
             'command: loop {
                 let Some(token) = self.token_stream.next() else {
-                    log::trace!("found end of token stream");
                     break 'command;
                 };
                 match token {
@@ -214,8 +212,7 @@ impl Iterator for CommandStream<'_> {
                     Operator(Redirect(redir)) => {
                         use RedirectOperator as R;
 
-                        log::info!("adding redirect {redir:?}");
-
+                        // add redirect
                         let Some(Ok(path_buf)) = self.token_stream.next().map(PathBuf::try_from)
                         else {
                             return Some(Err(anyhow!("expected a path after redirect operator")));
@@ -233,8 +230,6 @@ impl Iterator for CommandStream<'_> {
                                 Err(io_error) => return Some(Err(io_error.into())),
                             }
                         };
-
-                        log::info!("redirect with file: {file:?}");
 
                         match redir {
                             R::RStdin => todo!("handle [ file < command ]"), // todo error if command_vec.len() > 0 ???

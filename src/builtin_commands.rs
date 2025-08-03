@@ -3,6 +3,8 @@ use itertools::Itertools;
 use my_derives::MyFromStrParse;
 use rustyline::{error::ReadlineError, history::History};
 use std::fs::File;
+use std::io::{read_to_string, BufRead, BufReader, Read, Seek, SeekFrom};
+use std::path::Path;
 use std::{
     ffi::OsString,
     fmt::Debug,
@@ -93,32 +95,47 @@ impl BuiltinCommand {
                 }
             }
             Self::History => {
-                log::debug!("exec History");
-
                 match args_iter.next() {
-                    Some("-w") => {
-                        // write history to a file
-                        let file_str: Box<str> = if let Some(arg) = args_iter.next() {
-                            arg.into()
-                        } else if let Ok(histfile) = std::env::var("HISTFILE") {
-                            histfile.into_boxed_str()
-                        } else {
-                            Box::from("~/.bash_history")
-                        };
-                        let editor = EDITOR.read().unwrap();
+                    Some(d @ ("-a" | "-w")) => {
+                        // write or append history in memory to a file
 
-                        let history = editor.history();
-                        let mut file = File::create(&*file_str)?;
+                        let file_path: Box<Path> = args_iter
+                            .next()
+                            .map_or_else(history_default_path, |s| Path::new(s).into());
 
-                        for entry in history {
-                            writeln!(file, "{entry}")?;
+                        let mut editor = EDITOR.write().unwrap();
+
+                        match d {
+                            "-a" => editor.append_history(&file_path).unwrap(),
+                            "-w" => editor.save_history(&file_path).unwrap(),
+                            _ => unreachable!(),
                         }
                         drop(editor);
+
+                        let mut file = File::options().read(true).write(true).open(file_path)?;
+
+                        let mut reader = BufReader::new(&mut file);
+
+                        // remove any starting line "#V2"
+                        // todo use costom implementor of `History` to avoid this awkward overrride
+                        if reader
+                            .by_ref()
+                            .lines()
+                            .next()
+                            .is_some_and(|r| r.is_ok_and(|line| line == "#V2"))
+                        {
+                            // override file with the file excluding that first line
+                            let string = read_to_string(reader)?;
+                            file.set_len(0)?;
+                            file.seek(SeekFrom::Start(0))?;
+                            write!(file, "{string}")?;
+                            file.sync_all()?;
+                        }
 
                         Ok(ExitStatus::default())
                     }
                     Some("-r") => {
-                        // append history with all the given files
+                        // append loaded history with all the given files
 
                         if args_iter.peek().is_none() {
                             writeln!(err_writer, "expected argument").unwrap();
@@ -169,4 +186,17 @@ impl BuiltinCommand {
             }
         }
     }
+}
+
+fn history_default_path() -> Box<Path> {
+    const HISTFILE_KEY: &str = "HISTFILE";
+    const BACKUP: &str = "~/.bash_history";
+
+    std::env::var(HISTFILE_KEY).map_or_else(
+        |_| {
+            log::trace!("{HISTFILE_KEY} not declared in current env. Using backup: `{BACKUP}`");
+            Path::new(BACKUP).into()
+        },
+        |h| PathBuf::from(h).into(),
+    )
 }

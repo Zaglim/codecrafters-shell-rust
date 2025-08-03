@@ -1,29 +1,3 @@
-zed ~/Projects/leetcode
-rm -rf /home/zaglim/.local/share/zed/languages/rust-analyzer/rust-analyzer-2025-06-09
-rm -rf /home/zaglim/.local/share/zed/languages/rust-analyzer/*
-cargo test robot_test_thing -- --nocapture
-clear
-cargo test robot_test_thing -- --nocapture
-clear
-cargo test robot_test_thing -- --nocapture
-clear
-cargo test robot_test_thing -- --nocapture
-clear
-cargo test robot_test_thing -- --nocapture
-cargo leet test
-cargo leet submit
-cargo leet test
-cargo leet bench
-cargo bench
-cargo bench --help
-cargo leet test
-cargo test robot_test_thing --nocapture
-cargo test robot_test_thing -- --nocapture
-clear
-cargo test robot_test_thing -- --nocapture
-bacon
-cd
-clear
 lsusb
 xrandr --listmonitors
 xrandr
@@ -988,6 +962,12 @@ whatis audit
 (alias; declare -f) | /usr/bin/which --tty-only --read-alias --read-functions --show-tilde --show-dot asdfasdlfkj
 which aslkdjflkj
 sudo dnf --refresh upgrade && flatpak update
+bacon
+tail asdf.history
+wc
+help wc
+wc --help
+wc -l asdf.history
 history --help
 ls
 history
@@ -998,3 +978,23 @@ history -w asdf.history
 cat asdf.history
 clear
 history -w asdf.history second_file.history
+ls
+history
+history --help
+help history
+codecrafters test
+bacon
+codecrafters test
+bacon
+codecrafters submit
+bacon
+codecrafters test
+fzf
+rm Down
+rm Down.js
+ls
+cat asdf.history
+clear
+codecrafters test
+history
+history -w bash-history.txt

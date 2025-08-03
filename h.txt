@@ -1,0 +1,3 @@
+ls
+echo ASDF
+history -w h.txt
