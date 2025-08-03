@@ -5,12 +5,13 @@ mod executable_path;
 mod stream_target;
 mod tokens;
 
+use crate::builtin_commands::history_default_path;
 use crate::commands::{Command, CommandStream};
 use anyhow::Result as AnyResult;
 use builtin_commands::BuiltinCommand;
 use completion::MyCompleter;
 use rustyline::{
-    config::Configurer, error::ReadlineError, history::FileHistory, CompletionType, Editor,
+    config::Configurer, error::ReadlineError, history::FileHistory, CompletionType, Config, Editor,
 };
 use std::sync::{LazyLock, RwLock};
 
@@ -57,6 +58,7 @@ fn setup_rustyline_editor() -> Result<Editor<MyCompleter, FileHistory>, anyhow::
     let mut rl = Editor::new()?;
     rl.set_helper(Some(completer));
     rl.set_completion_type(CompletionType::List);
+    rl.load_history(&history_default_path())?;
     Ok(rl)
 }
 

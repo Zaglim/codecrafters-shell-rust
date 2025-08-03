@@ -188,7 +188,7 @@ impl BuiltinCommand {
     }
 }
 
-fn history_default_path() -> Box<Path> {
+pub fn history_default_path() -> Box<Path> {
     const HISTFILE_KEY: &str = "HISTFILE";
     const BACKUP: &str = "~/.bash_history";
 
