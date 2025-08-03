@@ -58,7 +58,10 @@ fn setup_rustyline_editor() -> Result<Editor<MyCompleter, FileHistory>, anyhow::
     let mut rl = Editor::new()?;
     rl.set_helper(Some(completer));
     rl.set_completion_type(CompletionType::List);
-    rl.load_history(&history_default_path())?;
+    let load_result = rl.load_history(&history_default_path());
+    if let Err(e) = load_result {
+        log::warn!("failed to load history on setup of rustyline editor: {e:?}");
+    }
     Ok(rl)
 }
 

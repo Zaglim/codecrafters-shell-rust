@@ -192,7 +192,7 @@ impl BuiltinCommand {
 pub fn history_default_path() -> Box<Path> {
     const HISTFILE_KEY: &str = "HISTFILE";
 
-    std::env::var(HISTFILE_KEY)
+    let path = std::env::var(HISTFILE_KEY)
         .map_or_else(
             |_| {
                 let backup_path = PathBuf::from_iter::<[&OsStr; 2]>([
@@ -205,7 +205,9 @@ pub fn history_default_path() -> Box<Path> {
                 );
                 backup_path
             },
-            |h| PathBuf::from(h),
+            PathBuf::from,
         )
-        .into_boxed_path()
+        .into_boxed_path();
+    log::trace!("using history default: {}", path.to_string_lossy());
+    path
 }
